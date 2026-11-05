@@ -1,7 +1,8 @@
 // The hunt model, snapshot in and view model out. Run: node --test mods/pixel-hunter/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS } from "../hunt.js";
+import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS } from "../hunt.js";
+import { readFileSync } from "node:fs";
 
 const HOME = "/Users/me";
 let n = 0;
@@ -307,4 +308,93 @@ test("a closed space's Monster is dropped; bad saved records start fresh", () =>
   assert.deepEqual(Object.keys(state.monsters), ["keep"]);
   assert.equal(areas[0].hp, HP_MAX);
   assert.equal(areas[0].mode, "idle");
+});
+
+// Rank and Stamina, from the statusLine script's session records.
+const rec = (over = {}) => ({ v: 1, app: "claude-code", model: "Opus 5.5", left: 62, at: 0, ...over });
+const hunters = (sessions, { now = 0, ranks, panes } = {}) => {
+  const a = space({ id: "rk" });
+  panes = panes ?? Object.keys(sessions).map((t) => agent(a, t, { app: "claude-code" }));
+  return hunt({ spaces: [a], panes, home: HOME, sessions, ranks, now }).areas[0].hunters;
+};
+
+test("Rank is the model with its grade from the table: Fable S, Opus A, Sonnet B, Haiku C", () => {
+  const hs = hunters({
+    f: rec({ model: "Fable 5.1" }), o: rec({ model: "Opus 5.5" }), s: rec({ model: "Sonnet 5.5" }),
+    h: rec({ model: "Haiku 5.5" }), id: rec({ model: "claude-sonnet-5-5" }),
+  });
+  assert.deepEqual(hs.map((h) => h.rank.text), ["[S] Fable 5.1", "[A] Opus 5.5", "[B] Sonnet 5.5", "[C] Haiku 5.5", "[B] claude-sonnet-5-5"]);
+  assert.deepEqual(hs[1].rank, { grade: "A", label: "Opus 5.5", text: "[A] Opus 5.5" });
+  assert.equal(gradeFor("OPUS"), "A", "case doesn't matter");
+  assert.equal(gradeFor("Magnum Opusculum"), "?", "whole words only");
+});
+
+test("an unknown model is graded ?, and with no record a Hunter shows ? with its program", () => {
+  const a = space({ id: "unk" });
+  const panes = [
+    agent(a, "m", { app: "claude-code" }),
+    agent(a, "c", { program: "codex", app: "codex" }),
+    agent(a, "x", { program: "" }),
+  ];
+  const hs = hunt({ spaces: [a], panes, home: HOME, sessions: { m: rec({ model: "Mythos 1" }) } }).areas[0].hunters;
+  assert.deepEqual(hs.map((h) => h.rank.text), ["[?] Mythos 1", "[?] codex", "[?] ?"]);
+  assert.equal(gradeFor(null), "?");
+  assert.equal(gradeFor(""), "?");
+});
+
+test("the grade table is data: another table changes the grade, no code involved", () => {
+  const sessions = { o: rec({ model: "Opus 5.5" }), n: rec({ model: "Mythos 1" }) };
+  const ranks = { grades: { Mythos: "S", Opus: "B" } };
+  assert.deepEqual(hunters(sessions, { ranks }).map((h) => h.rank.grade), ["B", "S"]);
+  // the shipped rank.json is the default table
+  const shipped = JSON.parse(readFileSync(new URL("../rank.json", import.meta.url), "utf8"));
+  assert.deepEqual(rankTable(shipped), RANKS);
+  assert.deepEqual(hunters(sessions, { ranks: shipped }).map((h) => h.rank.grade), ["A", "?"]);
+  // first entry wins when two words match
+  assert.equal(gradeFor("Opus Fable", { Fable: "S", Opus: "A" }), "S");
+  // a broken table falls back to the defaults instead of breaking the sidebar
+  for (const bad of [null, "x", [], { grades: [] }, { grades: "S" }]) assert.deepEqual(rankTable(bad).grades, RANKS.grades);
+  assert.deepEqual(rankTable({ grades: { Opus: 5, "": "S", Fable: " S " } }).grades, { Fable: "S" });
+});
+
+test("Stamina is blue from 50%, cream from 20% to 50%, peach below 20%", () => {
+  const lefts = [100, 50, 49.6, 49.4, 20, 19.6, 19.4, 0];
+  const sessions = Object.fromEntries(lefts.map((left, i) => [`l${i}`, rec({ left })]));
+  const hs = hunters(sessions);
+  assert.deepEqual(hs.map((h) => h.stamina.percent), [100, 50, 50, 49, 20, 20, 19, 0]);
+  assert.deepEqual(hs.map((h) => h.stamina.level), ["high", "high", "high", "mid", "mid", "mid", "low", "low"]);
+  assert.equal(staminaLevel(50), "high");
+  assert.equal(staminaLevel(20), "mid");
+  assert.equal(staminaLevel(19), "low");
+  assert.equal(staminaLevel(null), null);
+});
+
+test("no record, or no number in it, shows — and is never estimated", () => {
+  const a = space({ id: "none" });
+  const panes = [agent(a, "n"), agent(a, "z", { app: "claude-code" }), agent(a, "b"), agent(a, "o", { app: "codex" })];
+  const sessions = {
+    z: rec({ left: null }),
+    b: { model: "Opus 5.5", left: "62", at: "yesterday" },
+    o: rec(), // an old Claude Code record in a terminal now running codex
+  };
+  const hs = hunt({ spaces: [a], panes, home: HOME, sessions, now: 0 }).areas[0].hunters;
+  const none = { percent: null, level: null, stale: false, staleAt: null };
+  for (const h of hs) assert.deepEqual(h.stamina, none, h.terminal);
+  assert.equal(hs[1].rank.text, "[A] Opus 5.5", "the model still shows without a number");
+  assert.equal(hs[2].rank.text, "[?] Claude Code", "a record without a time isn't used");
+  assert.equal(hs[3].rank.text, "[?] Claude Code", "a record from another app isn't used");
+  const empty = hunt({ spaces: [a], panes, home: HOME }).areas[0].hunters;
+  assert.ok(empty.every((h) => h.rank.text === `[?] ${h.program}` && h.stamina.percent === null), "without the script: program and —");
+});
+
+test("a record older than the freshness limit is marked stale, with when it turns stale", () => {
+  const LIMIT = RANKS.staleAfterSeconds * 1000;
+  const sessions = { s: rec({ at: 1000, left: 15 }) };
+  const fresh = hunters(sessions, { now: 1000 + LIMIT })[0].stamina;
+  assert.deepEqual(fresh, { percent: 15, level: "low", stale: false, staleAt: 1000 + LIMIT });
+  const old = hunters(sessions, { now: 1001 + LIMIT })[0].stamina;
+  assert.deepEqual(old, { percent: 15, level: "low", stale: true, staleAt: null }, "the number stays, marked old");
+  const custom = hunters(sessions, { now: 1000 + 11_000, ranks: { staleAfterSeconds: 10 } })[0].stamina;
+  assert.equal(custom.stale, true, "the limit comes from the table");
+  assert.equal(rankTable({ staleAfterSeconds: -1 }).staleAfterSeconds, RANKS.staleAfterSeconds);
 });

@@ -104,9 +104,32 @@ function hunterRow(h, c) {
       .child(h_flex().gap(8).items_center()
         .child(div().flex_none().font_semibold().text_color(c.foreground).child(h.cls.name))
         .child(div().flex_none().text_size(13).font_semibold().text_color(stateColor(c, h.state)).child(stateText(h.state).toUpperCase())))
-      .child(h_flex().min_w(0).text_size(13.5).text_color(c.dim)
-        .child(div().flex_none().child(plain(h.program)))
-        .when(Boolean(h.branch), (el) => el.child(div().min_w(0).truncate().child(` · ⎇ ${plain(h.branch)}`)))));
+      .child(h_flex().min_w(0).gap(6).items_center().text_size(13.5).text_color(c.dim)
+        .child(gradeBadge(h.rank, c))
+        .child(div().flex_none().child(plain(h.rank.label)))
+        .when(Boolean(h.branch), (el) => el.child(div().min_w(0).truncate().child(`· ⎇ ${plain(h.branch)}`)))
+        .child(div().flex_1())
+        .child(staminaView(h.stamina, c))));
+}
+
+// Rank's letter grade as a small mint tag ("A"), dim for "?".
+export function gradeBadge(rank, c) {
+  return div().flex_none().px(4).py(1).text_size(12).font_semibold().text_color(c.canvas)
+    .bg(rank.grade === "?" ? c.dim : c.accent).child(plain(rank.grade));
+}
+
+// Stamina as a 46 px bar: blue (working) from 50%, cream (foreground) from 20%, peach
+// (blocked) below, never blinking. "STA —" with no data; a stale record is drawn dim with "old".
+export const STAMINA_W = 46;
+const STAMINA_COLOR = { high: "working", mid: "foreground", low: "blocked" };
+export function staminaView(st, c) {
+  if (st.percent == null) return div().flex_none().text_color(c.dim).child("STA —");
+  const inner = STAMINA_W - 2 * FRAME;
+  const fill = Math.max(0, Math.min(inner, Math.round((inner * st.percent) / 100)));
+  return h_flex().flex_none().gap(4).items_center()
+    .when(st.stale, (el) => el.child(div().text_size(12).text_color(c.dim).child("old")))
+    .child(div().relative().w(STAMINA_W).h(8 + 2 * FRAME).border(FRAME).border_color(c.border).bg(c.canvas)
+      .child(div().absolute().left(0).top(0).h(8).w(fill).bg(st.stale ? c.dim : c[STAMINA_COLOR[st.level]])));
 }
 
 export function areaList(self, model, c) {

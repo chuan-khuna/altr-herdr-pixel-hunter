@@ -1,0 +1,9 @@
+{
+  "grades": {
+    "Fable": "S",
+    "Opus": "A",
+    "Sonnet": "B",
+    "Haiku": "C"
+  },
+  "staleAfterSeconds": 300
+}

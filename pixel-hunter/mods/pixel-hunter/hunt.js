@@ -7,14 +7,21 @@
 //   spaces  [{ id, name, named, folder, branch, active, tabs: [{ id, index }] }] in Herdr's order
 //   panes   [{ pane, terminal, tab, status, program, cwd, branch, focused }]
 //           status: "working" | "blocked" | "done" | "idle" | null (null: not an agent)
-//           program: the program's name for people ("Claude Code"), shown in place of Rank for now
+//           program: the program's name for people ("Claude Code"), the Rank label with no record
+//           app:     optional, what the agent reported (OSC 7501 app, "claude-code"); a session
+//                    record written by another app (an old Claude run in that terminal) is ignored
 //           report: optional, the agent's own last status in herdr-core. Herdr shows "done" only
 //                   until someone looks, then "idle"; the core keeps "done". The Monster uses it
 //                   so a hunt finished while you watch still counts as done.
 //   home    the home folder, for "~"
 //   keys    optional { [spaceIndexFrom1]: "⌃1" }, the shortcut that selects each space
 //   state   persisted state from last time (see below); unknown fields are kept as they are
-//   now     ms, passed in, never read from a clock here, so HP wear is deterministic
+//   sessions optional { [terminal]: record } from the statusLine script (statusline.mjs):
+//           { app, model, left, at }: the model's name, the context window left in % (null:
+//           not known yet), written at `at` ms. Bad fields are ignored; nothing is estimated.
+//   ranks   optional { grades: { [word]: grade }, staleAfterSeconds } (rank.json); missing or
+//           bad parts fall back to RANKS
+//   now     ms, passed in, never read from a clock here, so HP wear and staleness are deterministic
 //
 // Output:
 //   areas   [{ id, index, name, named, current, map, monster, worst, path, branch, key, hunters, arena,
@@ -33,8 +40,14 @@
 //                   still saying done); it stays Slain until someone Hunts again (Respawn
 //                   with full HP); else "idle"
 //           wearing true while HP is wearing down (mode "hit"); see hpAfter()
-//   hunters [{ terminal, pane, tab, cls, state, status, program, branch, focused }]
+//   hunters [{ terminal, pane, tab, cls, state, status, program, rank, stamina, branch, focused }]
 //           cls     { name: "Knight", sprite: "Knight" }
+//           rank    { grade: "A", label: "Opus 5.5", text: "[A] Opus 5.5" }: grade "?" for a
+//                   model the table doesn't know; with no record, "?" and the program's name
+//           stamina { percent: 62, level: "high" | "mid" | "low", stale, staleAt }, or with no
+//                   record or no number in it { percent: null, level: null, stale: false,
+//                   staleAt: null } (shown as "STA —"). stale: the record is older than
+//                   staleAfterSeconds (shown as "old"); staleAt: when a fresh one turns stale
 //           state   "hunting" | "help" | "cleared" | "resting"
 //           branch  its own branch only when it differs from its Area's, else null
 //   state   the next persisted state: { ...state, classes: { [terminal]: "Knight" },
@@ -196,6 +209,69 @@ function assignClasses(order, old) {
   return classes;
 }
 
+// Rank and Stamina, from the statusLine script's session records. The grade table is data
+// (rank.json in the mod folder): the first of its words found in the model's name gives the grade.
+export const RANKS = {
+  grades: { Fable: "S", Opus: "A", Sonnet: "B", Haiku: "C" },
+  staleAfterSeconds: 300,
+};
+export const STAMINA_HIGH = 50; // this % and up: blue (working)
+export const STAMINA_LOW = 20; // below this %: peach (blocked); in between: cream (foreground)
+
+/** The grade table and freshness limit from rank.json's parsed contents, defaults filled in. */
+export function rankTable(cfg) {
+  const obj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const grades = obj(cfg) && obj(cfg.grades)
+    ? Object.fromEntries(Object.entries(cfg.grades)
+      .filter(([k, v]) => k.trim() && typeof v === "string" && v.trim())
+      .map(([k, v]) => [k.trim(), v.trim()]))
+    : RANKS.grades;
+  const s = obj(cfg) ? cfg.staleAfterSeconds : undefined;
+  return { grades, staleAfterSeconds: Number.isFinite(s) && s > 0 ? s : RANKS.staleAfterSeconds };
+}
+
+const words = (text) => text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/** A model's grade from the table (case-insensitive whole words, first entry wins), or "?". */
+export function gradeFor(model, grades = RANKS.grades) {
+  if (typeof model !== "string" || !model) return "?";
+  const have = words(model);
+  for (const [key, grade] of Object.entries(grades ?? {})) {
+    const want = words(key);
+    if (want.length && have.some((_, i) => want.every((w, j) => have[i + j] === w))) return grade;
+  }
+  return "?";
+}
+
+/** The Stamina level of a whole percent: high at 50 and up, mid from 20, low below 20. */
+export function staminaLevel(percent) {
+  if (!Number.isFinite(percent)) return null;
+  return percent >= STAMINA_HIGH ? "high" : percent >= STAMINA_LOW ? "mid" : "low";
+}
+
+// A usable session record, or null: from the same app, with a time and a model or a number.
+function sessionRecord(r, app) {
+  if (!r || typeof r !== "object" || !Number.isFinite(r.at)) return null;
+  if (app && typeof r.app === "string" && r.app && r.app !== app) return null;
+  const model = typeof r.model === "string" && r.model.trim() ? r.model.trim() : null;
+  const left = Number.isFinite(r.left) ? Math.min(100, Math.max(0, r.left)) : null;
+  return model || left != null ? { model, left, at: r.at } : null;
+}
+
+function rankOf(rec, program, table) {
+  const label = rec?.model ?? program;
+  const grade = rec?.model ? gradeFor(rec.model, table.grades) : "?";
+  return { grade, label, text: `[${grade}] ${label}` };
+}
+
+function staminaOf(rec, table, now) {
+  if (!rec || rec.left == null) return { percent: null, level: null, stale: false, staleAt: null };
+  const percent = Math.round(rec.left);
+  const staleAt = rec.at + table.staleAfterSeconds * 1000;
+  const stale = now > staleAt;
+  return { percent, level: staminaLevel(percent), stale, staleAt: stale ? null : staleAt };
+}
+
 function monsterView(r, now) {
   const wearing = r.since != null;
   return {
@@ -205,11 +281,13 @@ function monsterView(r, now) {
   };
 }
 
-export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}, now = 0 } = {}) {
+export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}, sessions = {}, ranks, now = 0 } = {}) {
   now = Number.isFinite(now) ? now : 0;
   spaces = (spaces ?? []).filter((s) => s && s.id != null);
   panes = (panes ?? []).filter(Boolean);
   keys = keys ?? {};
+  sessions = sessions && typeof sessions === "object" ? sessions : {};
+  const table = rankTable(ranks);
   state = state && typeof state === "object" ? state : {};
   const perSpace = spaces.map((s) => spacePanes(s, panes));
   const agentsOf = (ps) => ps.filter((p) => p.terminal && huntState(p.status));
@@ -226,17 +304,23 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
     const where = first?.cwd || s.folder || home;
     const branch = (first ? first.branch : s.branch) || null;
     const map = mapFor(index);
-    const hunters = agentsOf(ps).map((p) => ({
-      terminal: p.terminal,
-      pane: p.pane,
-      tab: p.tab,
-      cls: byName[classes[p.terminal]],
-      state: huntState(p.status),
-      status: p.status,
-      program: p.program || "?",
-      branch: p.branch && p.branch !== branch ? p.branch : null,
-      focused: !!p.focused,
-    }));
+    const hunters = agentsOf(ps).map((p) => {
+      const program = p.program || "?";
+      const rec = sessionRecord(sessions[p.terminal], p.app);
+      return {
+        terminal: p.terminal,
+        pane: p.pane,
+        tab: p.tab,
+        cls: byName[classes[p.terminal]],
+        state: huntState(p.status),
+        status: p.status,
+        program,
+        rank: rankOf(rec, program, table),
+        stamina: staminaOf(rec, table, now),
+        branch: p.branch && p.branch !== branch ? p.branch : null,
+        focused: !!p.focused,
+      };
+    });
     return {
       id: s.id,
       index,

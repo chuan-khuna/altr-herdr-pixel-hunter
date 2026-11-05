@@ -25,3 +25,15 @@ export const DEMO = {
     { pane: "dp7", terminal: "dx7", tab: "dt4", status: null, program: "zsh", cwd: `${H}/dotfiles`, branch: null },
   ],
 };
+
+// Session records as the statusLine script writes them, as in the mock: Opus 72, Sonnet 24,
+// codex with none (? and STA —), an Opus record gone old, Fable low at 15.
+export function demoSessions(now) {
+  const r = (model, left, age = 0) => ({ v: 1, app: "claude-code", model, left, at: now - age });
+  return {
+    dx1: r("Opus 5.5", 72),
+    dx2: r("Sonnet 5.5", 24),
+    dx4: r("Opus 5.5", 41, 60 * 60 * 1000),
+    dx6: r("Fable 5.1", 15),
+  };
+}
