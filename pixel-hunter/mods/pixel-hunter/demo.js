@@ -50,11 +50,12 @@ export function demoSessions(now) {
 }
 
 // Pet records as the Pets hook script writes them, as in the Hunter row record: login has five
-// (Dog and Cat shown, [+3] for Frog, Cub and Racoon), cart one, docs one. Pet Needs help is
-// ticket 06, so cart's Frog is Hunting for now.
+// (Dog and Cat shown, [+3] for Frog, Cub and Racoon), cart one (its Frog Needs help: a peach
+// frame), docs one. Login fix's Hunter is Hunting, but its Monkey Needs help, so that Area's
+// dot is peach and it opens although it isn't the current one.
 export function demoPets(now) {
-  const p = (agent, animal, type, description, age) => ({ v: 1, app: "claude-code", agent, type, description,
-    animal, state: "hunting", startedAt: now - age, seenAt: now });
+  const p = (agent, animal, type, description, age, help = false) => ({ v: 1, app: "claude-code", agent, type, description,
+    animal, state: help ? "help" : "hunting", ...(help ? { helpAt: now - 20000 } : {}), startedAt: now - age, seenAt: now });
   return {
     dx1: [
       p("dpa1", "Dog", "Explore", "find auth middleware", 300000),
@@ -63,7 +64,8 @@ export function demoPets(now) {
       p("dpa4", "Cub", "Plan", "plan the token refresh", 60000),
       p("dpa5", "Racoon", "general-purpose", "update the login docs", 30000),
     ],
-    dx2: [p("dpb1", "Frog", "Plan", "draft the price migration", 90000)],
+    dx2: [p("dpb1", "Frog", "Plan", "draft the price migration", 90000, true)],
     dx5: [p("dpc1", "Dog2", "Explore", "collect merged PR titles", 45000)],
+    dx7: [p("dpd1", "Monkey", "general-purpose", "rotate the session secret", 70000, true)],
   };
 }

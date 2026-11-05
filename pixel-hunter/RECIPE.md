@@ -82,9 +82,10 @@ Left to right:
        record shows `old` (12 px) between the number and a `dim` fill.
      - only when the Hunter has **Pets**, a third line under the face and the two lines,
        3 px below them and indented 46 px (past the face): up to 2 Pet icons, 3 px apart,
-       oldest first, then `[+N]` (12 px, `dim`, 2 px further) for the rest. An icon is
-       18 px: a 1 px `border` frame on canvas around the animal's 38 px faceset scaled to
-       16 px. The strip grows down with the line.
+       Needs help first, then Hunting, then oldest, then `[+N]` (12 px, `dim`, 2 px
+       further) for the rest. An icon is 18 px: a 1 px `border` frame on canvas around the
+       animal's 38 px faceset scaled to 16 px. A Pet that Needs help gets a 2 px peach
+       `#f3a787` frame instead, the face scaled to 14 px. The strip grows down with the line.
      - A Hunter that Needs help gets a 2 px peach frame and a faint peach tint
        (`#f3a78712`) around its row. Other rows show `surface` on hover.
 
@@ -142,7 +143,8 @@ current one.
 
 - The Area's dot, a tab's dot and the arena's order use the most urgent state: Needs
   help > Hunting > Cleared > Resting. The Area's dot also counts its Hunters' Pets (a
-  Hunting Pet makes it blue); tab dots and the arena count Hunters only. The arena shows four Hunters picked that way (ties
+  Hunting Pet makes it blue, a Pet that Needs help peach); tab dots, pane headers and the
+  arena count Hunters only. The arena shows four Hunters picked that way (ties
   keep their order) and `+N` for the rest.
 - Herdr shows `done` only until someone looks, then `idle`, so a Hunter you've seen
   finish reads Resting.
@@ -177,7 +179,7 @@ current one.
 - Spaces take maps in order, Forest, Desert, Dungeon, Field, Ruins, Lakeside, and cycle
   after six. The name is Herdr's space name (repo, then folder, then `~`), or the custom
   name once renamed.
-- Open or closed: the current Area and any Area with a Hunter that Needs help are open,
+- Open or closed: the current Area and any Area with a Hunter or Pet that Needs help are open,
   the others closed. Clicking the chevron toggles it without selecting the space, and that
   choice is remembered per space across restarts. Needs help always opens an Area; its
   chevron is then dimmed to 50%, does nothing, and says "Needs help keeps this Area open".
@@ -217,17 +219,26 @@ current one.
   terminal's other live Pets don't have while any are left, the first try seeded from the
   subagent's id, so one that stops and starts again under the same id comes back as the
   same animal when it's free.
-- Pets have no Class or Rank, never change the Hunters' Classes, and are always Hunting
-  (Needs help for Pets isn't built). They are Party members: a Hunting Pet keeps HP
-  wearing and the Monster from being Slain, also while its Hunter is Cleared or Resting.
-- Shown: the oldest 2, then `[+N]`. Hovering an icon shows `type · task`
-  (`Explore · find auth middleware`); hovering `[+N]` lists the hidden ones, one per line
+- Pets have no Class or Rank and never change the Hunters' Classes. A Pet is Hunting, or
+  Needs help while its subagent waits on a permission prompt. They are Party members: a
+  Hunting Pet keeps HP wearing and the Monster from being Slain, also while its Hunter is
+  Cleared or Resting. A Pet that Needs help turns its Area's dot peach and opens the Area
+  (held open, like a Hunter's), whatever its Hunter's state; pane headers and tabs don't
+  change.
+- Needs help starts at the subagent's `PermissionRequest` (`pets.mjs help`) and ends at
+  its next `PostToolUse` (`pets.mjs unhelp`), or at the first `subagentStatusLine` tick
+  more than 2 s after it (no tick comes while a prompt is open, and a denied prompt fires
+  no `PostToolUse`).
+- Shown: Needs help first, then Hunting, then oldest; 2, then `[+N]`. Hovering an icon
+  shows `type · task` (`Explore · find auth middleware`, `Needs help · ` in front when it
+  does); hovering `[+N]` lists the hidden ones, one per line
   (`Frog: Explore · list the session cookies`). Clicking an icon focuses the Hunter's
   terminal (`agent.focus`).
 - A Pet leaves when its subagent stops or its task ends, when its Hunter's terminal closes
   or stops being an agent, when its record's `app` isn't the pane's, or once it hasn't
   reported for `petStaleAfterSeconds` (120, in `rank.json`), dropped at exactly that
-  limit. The sidebar's one wake-up timer also arms for the next Pet to go.
+  limit, but never while it Needs help. The sidebar's one wake-up timer also arms for the
+  next Pet to go.
 
 **Tabs**: click selects (`tab.select`), double-click renames (`tab.rename`), press on one
 tab and release on another moves it there (`tab.move`), right-click opens Herdr's tab
@@ -284,9 +295,9 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
   Maps, Monsters, Classes, states, arena pick, HP, Slain, Respawn, open or closed, Rank,
   Stamina, tokens, Hunter names (`name`, `programLabel`, `tokens` on each Hunter), Pets
   (`pets: { shown, more, all }` on each Hunter, each Pet `{ agent, type, description,
-  animal, state, startedAt, staleAt }`) and pins are all decided here, with time passed in, and `random` (default
+  animal, state, startedAt, staleAt }`, `staleAt` null while it Needs help) and pins are all decided here, with time passed in, and `random` (default
   `Math.random`) used only for the Respawn pick. Tests: `node --test` in the mod folder
-  (`test/hunt.test.js`, `test/statusline.test.js`, `test/pets.test.js`, 76 cases).
+  (`test/hunt.test.js`, `test/statusline.test.js`, `test/pets.test.js`, 83 cases).
 - `world.js`: the only place that reads Herdr for the model (`spaces()`, `panes()`,
   `terminals()` for herdr-core's own `done`, `keys()`, `home()`). It keeps the model's
   state in `shared("pixel-hunter.state")`:
@@ -318,7 +329,8 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
 - `pets.mjs`: the optional Claude Code Pets hook script, plain Node with no Herdr imports,
   run by Claude Code with `"subagentStatusLine": { "type": "command", "command": "node
   ~/.config/herdr-app/mods/pixel-hunter/pets.mjs tasks" }` and the hooks `SubagentStart`
-  (`pets.mjs start`) and `SubagentStop` (`pets.mjs stop`). `start` writes
+  (`pets.mjs start`), `SubagentStop` (`pets.mjs stop`), `PermissionRequest`
+  (`pets.mjs help`) and `PostToolUse` (`pets.mjs unhelp`). `start` writes
   `{ v: 1, app: "claude-code", terminal, session, agent, type, description, animal,
   state: "hunting", startedAt, seenAt, startAt }` to
   `<Herdr home>/data/pixel-hunter/pets/<HC_TERMINAL_ID>/<agent_id>.json` and clears
@@ -326,7 +338,10 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
   `tasks[].id` to records, fills in `type` (`agentType`) and `description` (never
   `label`), refreshes `seenAt` at most every 30 s unless something changed, and deletes
   a `completed`, `failed` or `killed` task's record unless it started again under 10 s
-  ago. `$PIXEL_HUNTER_PETS` overrides the folder. Same rules as the statusLine script:
+  ago. `help` sets an existing record's `state: "help"`, `helpAt` and `seenAt` when the
+  input has an `agent_id` (a Hunter's own prompt has none); `unhelp` sets `"hunting"` and
+  drops `helpAt`, writing only for a record in `help`; a `tasks` tick more than 2 s after
+  `helpAt` does the same. A `help` record counts as live for `start`'s animal pick. `$PIXEL_HUNTER_PETS` overrides the folder. Same rules as the statusLine script:
   plain ids only, control and bidi characters stripped, 80 characters, temp file and
   rename, nothing outside Herdr, exit 0; it prints nothing.
 - `theme.js`: font names, `FRAME = 2`, the night colours as fallbacks.
@@ -407,12 +422,17 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   statusLine's `HC_TERMINAL_ID` must reach the script (herdr-core sets it in the
   terminal's environment). Records of closed terminals aren't deleted; they go stale and
   show only if a live agent pane has that terminal id.
-- **Pets need the hook setup**: `subagentStatusLine` plus the `SubagentStart` and
-  `SubagentStop` hooks in the person's own Claude Code settings (the README has the
+- **Pets need the hook setup**: `subagentStatusLine` plus the `SubagentStart`,
+  `SubagentStop`, `PermissionRequest` and `PostToolUse` hooks in the person's own Claude Code settings (the README has the
   block; the mod never edits it), and `node` on PATH. The `subagentStatusLine` ticks
   every 5 s on its own while Claude Code's agent panel has a row; it doesn't need the
   statusLine's `refreshInterval`. A Pet that hasn't reported for 2 minutes
   (`petStaleAfterSeconds`) leaves, so a crashed session can't keep a Monster alive.
+- **Pet Needs help has no heartbeat.** Claude Code sends no status-line tick while a
+  permission prompt is open (114 s seen), so a Pet that Needs help is never dropped as
+  stale, and a tick is what proves the prompt closed. `PostToolUse` fires for every tool
+  call, so `unhelp` costs one short `node` start per call. A subagent's prompt also
+  blocks its Hunter's terminal, so in practice the Hunter's row Needs help too.
 - **A waiting subagent isn't a Pet.** When a subagent ends its turn to wait for a
   background shell or its own subagent, Claude Code fires `SubagentStop` and calls its
   task `completed`, so its Pet leaves (and the Monster can fall) until it wakes with a
@@ -457,7 +477,7 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
 ## Done when
 
 - `herdr-app check ~/.config/herdr-app/mods/pixel-hunter` passes, and `node --test` in that
-  folder passes all 76 tests.
+  folder passes all 83 tests.
 - `layout.switch pixel-hunter` shows the 320 px sidebar (logo, arena, Area list), the 44 px
   tab bar and framed panes with 30 px Hunter headers; `herdr-app status` lists no errors.
 - `PIXEL HUNTER` is in Press Start 2P and the rest in Pixelify Sans; frames are square 2 px.
@@ -482,6 +502,11 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   icons and `[+2]` under its row, the count drops as they finish, and the line goes when
   the last one does. A record whose `seenAt` is 110 s old disappears about 10 s later
   on its own.
+- With the Pets setup, a subagent's permission prompt gives its icon a 2 px peach frame
+  and moves it into the shown pair; approving it (the subagent runs the tool) brings the
+  1 px frame back, and so does denying it, at the next tick. A hand-written record with
+  `"state": "help"` under a Hunting Hunter in another Area turns that Area's dot peach
+  and opens it, and stays past 2 minutes without a heartbeat.
 - `{ "tabs": { "<a named tab>": "Samurai" } }` in `classes.json` turns that tab's Hunter
   into a Samurai in the sidebar, the arena, the tab face and the pane header without a
   restart.

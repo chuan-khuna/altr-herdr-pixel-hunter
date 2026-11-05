@@ -61,7 +61,8 @@
 //           wearing true while HP is wearing down (mode "hit"); see hpAfter()
 //           expanded whether its Hunters are listed under it (the chevron ▾, else ▸): a choice
 //                   made by hand (state.collapsed) wins over the default (open when current,
-//                   closed otherwise), but an Area with a Hunter that Needs help always opens
+//                   closed otherwise), but an Area with a Hunter or Pet that Needs help
+//                   always opens
 //           held    true while Needs help holds it open, so the chevron can't close it
 //           tabs    [{ id, index, lead, worst, hunters }] in tab order, for the tab bar: lead is the
 //                   tab's first Hunter in pane order (its face), or null with no agent (a map
@@ -83,8 +84,9 @@
 //                   used is still 0 (no response yet). Never computed from the percentages.
 //           pets    { shown, more, all }: its Pets, most urgent first, then oldest; shown the first
 //                   PETS_SHOWN (2) for the row's icons, more how many others ("[+N]"). Each Pet:
-//                   { agent, type, description, animal, state: "hunting", startedAt, staleAt }
-//                   (staleAt: when it is dropped unless it reports again). Pets have no Class
+//                   { agent, type, description, animal, state: "hunting" | "help", startedAt,
+//                   staleAt } (staleAt: when it is dropped unless it reports again; null while
+//                   it Needs help, which is never dropped as stale). Pets have no Class
 //                   or Rank and never change the Hunters' Classes
 //           state   "hunting" | "help" | "cleared" | "resting"
 //           branch  its own branch only when it differs from its Area's, else null
@@ -442,24 +444,25 @@ export const ANIMALS = ["Cat", "Dog", "Dog2", "Cub", "Frog", "Racoon", "Monkey",
 export const PETS_SHOWN = 2;
 
 /** A Hunter's Pets from its terminal's records: those of the pane's app, seen within
- *  petStaleAfterSeconds (dropped at exactly the limit), most urgent first (by PRIORITY; every
- *  Pet is Hunting for now), then oldest. A record without an agent id, a known animal or a
- *  heartbeat is ignored; nothing is guessed. */
+ *  petStaleAfterSeconds (dropped at exactly the limit; never one that Needs help, since no
+ *  heartbeat comes while its permission prompt is open), most urgent first (Needs help, then
+ *  Hunting), then oldest. A record's state is "help" or else Hunting. A record without an agent
+ *  id, a known animal or a heartbeat is ignored; nothing is guessed. */
 export function petsOf(records, app, table, now) {
   const limit = table.petStaleAfterSeconds * 1000;
   const all = (Array.isArray(records) ? records : [])
     .filter((r) => r && typeof r === "object" && typeof r.agent === "string" && r.agent
       && ANIMALS.includes(r.animal) && Number.isFinite(r.seenAt))
     .filter((r) => !(app && typeof r.app === "string" && r.app && r.app !== app))
-    .filter((r) => now < r.seenAt + limit)
+    .filter((r) => r.state === "help" || now < r.seenAt + limit)
     .map((r) => ({
       agent: r.agent,
       type: typeof r.type === "string" && r.type.trim() ? r.type.trim() : null,
       description: typeof r.description === "string" ? r.description.trim() : "",
       animal: r.animal,
-      state: "hunting",
+      state: r.state === "help" ? "help" : "hunting",
       startedAt: Number.isFinite(r.startedAt) ? r.startedAt : r.seenAt,
-      staleAt: r.seenAt + limit,
+      staleAt: r.state === "help" ? null : r.seenAt + limit,
     }))
     .sort((a, b) => PRIORITY.indexOf(a.state) - PRIORITY.indexOf(b.state) || a.startedAt - b.startedAt
       || (a.agent < b.agent ? -1 : a.agent > b.agent ? 1 : 0));
@@ -572,7 +575,8 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       };
     });
     const byTerminal = new Map(hunters.map((h) => [h.terminal, h]));
-    const help = hunters.some((h) => h.state === "help");
+    // Needs help, a Hunter's or a Pet's, holds the Area open
+    const help = hunters.some((h) => h.state === "help" || h.pets.all.some((pet) => pet.state === "help"));
     if (typeof oldCollapsed[s.id] === "boolean") collapsed[s.id] = oldCollapsed[s.id];
     for (const p of ps) {
       const hunter = (p.terminal && byTerminal.get(p.terminal)) || null;

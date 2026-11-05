@@ -86,11 +86,18 @@ file falls back to these defaults.
 
 Every subagent a Claude Code Hunter starts (the Agent tool, nested ones too)
 shows as a **Pet**: a small animal icon on a line under its Hunter's row. A
-row shows at most 2, oldest first, then `[+N]`. Hovering an icon shows the
-subagent's type and the task its Hunter gave it, hovering `[+N]` lists the
-others, and clicking an icon focuses the Hunter's terminal. Pets are part of
-the Party: while one Hunts, the Monster's HP keeps wearing down and it isn't
-Slain, even if its Hunter is Cleared or Resting.
+row shows at most 2, Needs help first, then Hunting, then oldest, then
+`[+N]`. Hovering an icon shows the subagent's type and the task its Hunter
+gave it, hovering `[+N]` lists the others, and clicking an icon focuses the
+Hunter's terminal. Pets are part of the Party: while one Hunts, the Monster's
+HP keeps wearing down and it isn't Slain, even if its Hunter is Cleared or
+Resting.
+
+A subagent waiting for your permission **Needs help**: its icon gets a 2 px
+peach frame, it moves ahead of the Hunting Pets (so `[+N]` never hides it),
+and its Area's dot turns peach and the Area opens, as for a Hunter that Needs
+help. Pane headers and tabs don't change: the prompt already shows in the
+Hunter's terminal.
 
 Herdr can't see subagents (they run inside the Hunter's terminal), so Claude
 Code has to write them down for the mod. Without this setup no Pet is ever
@@ -106,7 +113,9 @@ merging the hooks with any you already have:
   },
   "hooks": {
     "SubagentStart": [{ "hooks": [{ "type": "command", "command": "node ~/.config/herdr-app/mods/pixel-hunter/pets.mjs start" }] }],
-    "SubagentStop": [{ "hooks": [{ "type": "command", "command": "node ~/.config/herdr-app/mods/pixel-hunter/pets.mjs stop" }] }]
+    "SubagentStop": [{ "hooks": [{ "type": "command", "command": "node ~/.config/herdr-app/mods/pixel-hunter/pets.mjs stop" }] }],
+    "PermissionRequest": [{ "hooks": [{ "type": "command", "command": "node ~/.config/herdr-app/mods/pixel-hunter/pets.mjs help" }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "node ~/.config/herdr-app/mods/pixel-hunter/pets.mjs unhelp" }] }]
   }
 }
 ```
@@ -124,9 +133,17 @@ merging the hooks with any you already have:
   refreshes its heartbeat at most every 30 s and removes finished tasks. It
   prints nothing, so the agent panel keeps its own rows. It doesn't depend on
   the statusLine's `refreshInterval`, which stays at 60.
+- `help` (PermissionRequest) marks a subagent's Pet Needs help; a prompt of
+  the Hunter's own carries no agent id and changes nothing. `unhelp`
+  (PostToolUse) puts it back to Hunting once it runs a tool. It writes only
+  for a Pet that Needs help, but Claude Code still starts `node` for every
+  tool call. No tick comes while a prompt is open, so the first tick more
+  than 2 s after the prompt also puts it back (a denied prompt fires no
+  PostToolUse).
 - A Pet leaves when its task ends, when its Hunter's terminal closes or stops
   being an agent, or after `petStaleAfterSeconds` (2 minutes) without a
-  report, for example after a crash.
+  report, for example after a crash. A Pet that Needs help never leaves that
+  way, however long the prompt stays open.
 - A subagent that ends its turn to wait (for a background shell, or for a
   subagent of its own) leaves too: Claude Code stops it and calls its task
   completed. It comes back, as the same animal when that one is free, when it

@@ -915,3 +915,55 @@ test("Pets never change Class assignment", () => {
   assert.equal(withPets.areas[0].hunters.length, 2, "Pets are not Hunters");
   assert.equal(withPets.areas[0].arena.hunters.length, 2, "the arena picks Hunters only");
 });
+
+test("a Pet that Needs help beyond the first two moves into the shown pair", () => {
+  const s = space();
+  const pets = { x1: [
+    petRec("p1", { animal: "Cat", startedAt: 1000 }), petRec("p2", { animal: "Dog", startedAt: 2000 }),
+    petRec("p3", { animal: "Frog", startedAt: 3000 }), petRec("p4", { animal: "Cub", startedAt: 4000, state: "help", helpAt: 4500 }),
+    petRec("p5", { animal: "Pig", startedAt: 5000, state: "help", helpAt: 5500 }),
+  ] };
+  const h = hunt({ spaces: [s], panes: [agent(s, "x1", { status: "working" })], home: HOME, pets, now: 6000 }).areas[0].hunters[0];
+  assert.deepEqual(h.pets.shown.map((p) => [p.agent, p.state]), [["p4", "help"], ["p5", "help"]], "Needs help first, then oldest");
+  assert.equal(h.pets.more, 3);
+  assert.deepEqual(h.pets.all.map((p) => p.agent), ["p4", "p5", "p1", "p2", "p3"]);
+  const one = hunt({ spaces: [s], panes: [agent(s, "x1")], home: HOME, pets: { x1: pets.x1.slice(0, 4) }, now: 6000 }).areas[0].hunters[0];
+  assert.deepEqual(one.pets.shown.map((p) => p.agent), ["p4", "p1"], "then Hunting, oldest first");
+  // an unknown state is Hunting
+  const odd = hunt({ spaces: [s], panes: [agent(s, "x1")], home: HOME, pets: { x1: [petRec("q", { state: "weird" })] }, now: 2000 });
+  assert.equal(odd.areas[0].hunters[0].pets.all[0].state, "hunting");
+});
+
+test("a Pet that Needs help is never dropped as stale", () => {
+  const s = space();
+  const panes = [agent(s, "x1", { status: "working" })];
+  const LIMIT = RANKS.petStaleAfterSeconds * 1000;
+  const pets = { x1: [petRec("waiting", { seenAt: 10000, state: "help", helpAt: 10000 }), petRec("quiet", { seenAt: 10000 })] };
+  const at = (now, ranks) => hunt({ spaces: [s], panes, home: HOME, pets, ranks, now }).areas[0].hunters[0].pets.all;
+  assert.deepEqual(at(10000 + LIMIT).map((p) => p.agent), ["waiting"], "past the limit only the Hunting Pet goes");
+  assert.deepEqual(at(10000 + 60 * LIMIT, { petStaleAfterSeconds: 30 }).map((p) => p.agent), ["waiting"]);
+  assert.equal(at(10000 + LIMIT)[0].staleAt, null, "nothing to wake for");
+});
+
+test("a Pet that Needs help raises its Area's worst state and expands it, while its Hunter Hunts or Rests", () => {
+  const s = space({ active: false });
+  const help = { x1: [petRec("p1", { seenAt: 1000, state: "help", helpAt: 1000 }), petRec("p2", { seenAt: 1000 })] };
+  for (const status of ["working", "idle", "done"]) {
+    const plain = hunt({ spaces: [s], panes: [agent(s, "x1", { status })], home: HOME, pets: { x1: [petRec("p2")] }, now: 2000 }).areas[0];
+    assert.equal(plain.expanded, false, `${status}: a Hunting Pet doesn't open an Area that isn't current`);
+    const a = hunt({ spaces: [s], panes: [agent(s, "x1", { status })], home: HOME, pets: help, now: 2000 }).areas[0];
+    assert.equal(a.worst, "help", `${status}: the dot is peach`);
+    assert.equal(a.expanded, true, `${status}: the Area opens`);
+    assert.equal(a.held, true, `${status}: and the chevron can't close it`);
+    assert.notEqual(a.hunters[0].state, "help", "the Hunter's own state is unchanged");
+    assert.equal(a.tabs[0].worst, a.hunters[0].state, "the tab's dot stays the Hunter's");
+  }
+  // a hand-made collapse doesn't hide it
+  const collapsed = hunt({ spaces: [s], panes: [agent(s, "x1", { status: "working" })], home: HOME, pets: help, now: 2000,
+    state: { collapsed: { [s.id]: true } } }).areas[0];
+  assert.equal(collapsed.expanded, true);
+  // pane headers don't change
+  const panesOut = hunt({ spaces: [s], panes: [agent(s, "x1", { status: "working" })], home: HOME, pets: help, now: 2000 }).panes;
+  const panesPlain = hunt({ spaces: [s], panes: [agent(s, "x1", { status: "working" })], home: HOME, now: 2000 }).panes;
+  assert.deepEqual(panesOut.map((p) => p.frame), panesPlain.map((p) => p.frame));
+});

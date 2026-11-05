@@ -29,7 +29,7 @@ function wakeAt(model, now) {
   for (const a of model.areas) {
     for (const h of a.hunters) {
       if (h.stamina.staleAt != null) at = Math.min(at, h.stamina.staleAt + 1);
-      for (const pet of h.pets.all) at = Math.min(at, pet.staleAt); // dropped at exactly staleAt
+      for (const pet of h.pets.all) if (pet.staleAt != null) at = Math.min(at, pet.staleAt); // dropped at exactly staleAt
     }
   }
   return Number.isFinite(at) ? at : null;

@@ -207,11 +207,10 @@ test("malformed stdin exits 0, writes nothing to stderr and changes nothing", ()
   run("start", startOf("a1"), { dir });
   const before = snapshot(dir);
   const bad = ["", "not json", "{", "null", "[1,2]", "42", '"text"', '{"agent_id": 5}', '{"agent_id": {"x": 1}}', '{"tasks": "x"}', '{"tasks": [{"id": 5}]}'];
-  for (const action of ["start", "stop", "tasks"]) {
+  for (const action of ["start", "stop", "tasks", "help", "unhelp"]) {
     for (const input of bad) run(action, input, { dir }); // run() checks exit 0, no stdout, no stderr
   }
   run("unknown", startOf("a9"), { dir });
-  run("help", { agent_id: "a1" }, { dir }); // ticket 06's actions do nothing yet
   run("", startOf("a9"), { dir });
   assert.deepEqual(snapshot(dir), before);
 });
@@ -226,4 +225,91 @@ test("nothing is written without a plain HC_TERMINAL_ID or agent id", () => {
     const { dir } = run("start", startOf(agent), {});
     assert.deepEqual(snapshot(dir), {}, `nothing for agent ${JSON.stringify(agent)}`);
   }
+});
+
+const helpOf = (agent, over = {}) => ({ session_id: "s-1", agent_id: agent, agent_type: "Explore", hook_event_name: "PermissionRequest",
+  tool_name: "Bash", tool_input: { command: "echo probe > probe1.txt" }, ...over });
+const usedOf = (agent, over = {}) => ({ session_id: "s-1", agent_id: agent, agent_type: "Explore", hook_event_name: "PostToolUse",
+  tool_name: "Bash", tool_response: { stdout: "" }, ...over });
+
+test("help marks a Pet Needs help and sets helpAt; unhelp marks it Hunting again", () => {
+  const dir = newDir();
+  run("start", startOf("a1"), { dir });
+  run("start", startOf("a2"), { dir });
+  const before = Date.now();
+  run("help", helpOf("a1"), { dir });
+  const r = pet(dir, "a1");
+  assert.equal(r.state, "help");
+  assert.ok(r.helpAt >= before && r.helpAt <= Date.now());
+  assert.ok(r.seenAt >= r.helpAt - 1, "the prompt is a sign of life");
+  assert.equal(pet(dir, "a2").state, "hunting", "only that Pet");
+  const a2 = readFileSync(petFile(dir, "a2"), "utf8");
+  run("unhelp", usedOf("a2"), { dir });
+  assert.equal(readFileSync(petFile(dir, "a2"), "utf8"), a2, "a Hunting Pet's tool call writes nothing");
+  run("unhelp", usedOf("a1"), { dir });
+  const back = pet(dir, "a1");
+  assert.equal(back.state, "hunting");
+  assert.equal(back.helpAt, undefined, "helpAt goes with Needs help");
+  assert.equal(back.animal, r.animal);
+  assert.deepEqual(readdirSync(join(dir, "t7")).sort(), ["a1.json", "a2.json"], "no temporary files are left behind");
+});
+
+test("help and unhelp do nothing without an agent_id or for an unknown Pet", () => {
+  const dir = newDir();
+  run("start", startOf("a1"), { dir });
+  const before = snapshot(dir);
+  // the Hunter's own prompt and tool calls carry no agent_id
+  const { agent_id: _a, agent_type: _t, ...own } = helpOf("a1");
+  run("help", own, { dir });
+  run("help", helpOf("unknown"), { dir });
+  run("help", helpOf("../a1"), { dir });
+  assert.deepEqual(snapshot(dir), before);
+  run("help", helpOf("a1"), { dir });
+  const marked = snapshot(dir);
+  const { agent_id: _b, agent_type: _u, ...ownUse } = usedOf("a1");
+  run("unhelp", ownUse, { dir });
+  run("unhelp", usedOf("unknown"), { dir });
+  assert.deepEqual(snapshot(dir), marked);
+  assert.equal(pet(dir, "unknown"), null, "help never creates a record");
+  // nothing outside a Herdr terminal
+  const { dir: outside } = run("help", helpOf("a1"), { terminal: null });
+  assert.deepEqual(snapshot(outside), {});
+});
+
+test("a tasks tick more than 2 s after helpAt marks the Pet Hunting; one within 2 s leaves it in Needs help", () => {
+  const dir = newDir();
+  run("start", startOf("a1"), { dir });
+  run("tasks", tick([task("a1")]), { dir });
+  run("help", helpOf("a1"), { dir });
+  // a tick right after the prompt opened (it was already on its way): still Needs help
+  run("tasks", tick([task("a1")]), { dir });
+  assert.equal(pet(dir, "a1").state, "help");
+  const at = (ms) => writeFileSync(petFile(dir, "a1"), JSON.stringify({ ...pet(dir, "a1"), helpAt: Date.now() - ms }));
+  at(1500);
+  run("tasks", tick([task("a1")]), { dir });
+  assert.equal(pet(dir, "a1").state, "help", "1.5 s after helpAt: within 2 s");
+  // a denied prompt fires no PostToolUse: the next tick (none come while it is open) clears it
+  at(2500);
+  const before = Date.now();
+  run("tasks", tick([task("a1")]), { dir });
+  const r = pet(dir, "a1");
+  assert.equal(r.state, "hunting", "2.5 s after helpAt: the prompt has closed");
+  assert.equal(r.helpAt, undefined);
+  assert.ok(r.seenAt >= before);
+  // a help record without a helpAt is cleared by any tick
+  writeFileSync(petFile(dir, "a1"), JSON.stringify({ ...pet(dir, "a1"), state: "help" }));
+  run("tasks", tick([task("a1")]), { dir });
+  assert.equal(pet(dir, "a1").state, "hunting");
+});
+
+test("a Pet that Needs help keeps its animal from a new Pet even when its heartbeat is old", () => {
+  const dir = newDir();
+  run("start", startOf("a1"), { dir });
+  run("help", helpOf("a1"), { dir });
+  const animal = pet(dir, "a1").animal;
+  // the prompt has been open for 10 minutes: no tick has refreshed seenAt
+  writeFileSync(petFile(dir, "a1"), JSON.stringify({ ...pet(dir, "a1"), session: "s-0", seenAt: Date.now() - 600000, helpAt: Date.now() - 600000 }));
+  run("start", startOf("a2"), { dir });
+  assert.ok(pet(dir, "a1"), "not cleared away as a leftover");
+  assert.notEqual(pet(dir, "a2").animal, animal);
 });

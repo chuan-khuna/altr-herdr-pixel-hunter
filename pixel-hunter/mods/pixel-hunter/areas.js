@@ -157,19 +157,24 @@ function hunterRow(h, c) {
 
 // A Hunter's Pets, as in layout F: one line of 18 px animal icons (the 38 px faceset scaled into
 // a 1 px frame) under the lines, indented past the face: the first 2 (hunt.js orders them),
-// then a dim [+N]. Hovering an icon shows its subagent type and task; hovering [+N] lists the
-// others. Clicking an icon focuses the Hunter's terminal, where the Pet runs.
+// then a dim [+N]. A Pet that Needs help gets a FRAME (2 px) peach frame instead of the 1 px
+// border, its face shrunk to fit. Hovering an icon shows its subagent type and task; hovering
+// [+N] lists the others. Clicking an icon focuses the Hunter's terminal, where the Pet runs.
 export const PET_ICON = 18;
-const petLabel = (p) => [p.type ?? "Pet", p.description].filter(Boolean).join(" · ");
+const petLabel = (p) => [p.state === "help" ? "Needs help" : null, p.type ?? "Pet", p.description].filter(Boolean).join(" · ");
 function petLine(h, c) {
   const hidden = h.pets.all.slice(h.pets.shown.length);
   return h_flex().ml(38 + 8).mt(3).gap(3).items_center()
-    .children(h.pets.shown.map((p) => div().id(`ph-pet-${h.terminal}-${p.agent}`)
-      .relative().w(PET_ICON).h(PET_ICON).flex_none().overflow_hidden()
-      .border(1).border_color(c.border).bg(c.canvas).cursor_pointer()
-      .tooltip(petLabel(p))
-      .on_click((_e, cx) => { cx.stop_propagation(); run("agent.focus", { terminal: h.terminal }); })
-      .child(image(animalFace(p.animal)).absolute().left(0).top(0).w(PET_ICON - 2).h(PET_ICON - 2))))
+    .children(h.pets.shown.map((p) => {
+      const help = p.state === "help";
+      const edge = help ? FRAME : 1;
+      return div().id(`ph-pet-${h.terminal}-${p.agent}`)
+        .relative().w(PET_ICON).h(PET_ICON).flex_none().overflow_hidden()
+        .border(edge).border_color(help ? c.blocked : c.border).bg(c.canvas).cursor_pointer()
+        .tooltip(petLabel(p))
+        .on_click((_e, cx) => { cx.stop_propagation(); run("agent.focus", { terminal: h.terminal }); })
+        .child(image(animalFace(p.animal)).absolute().left(0).top(0).w(PET_ICON - 2 * edge).h(PET_ICON - 2 * edge));
+    }))
     .when(h.pets.more > 0, (el) => el.child(div().id(`ph-petmore-${h.terminal}`).ml(2).flex_none()
       .text_size(12).text_color(c.dim)
       .tooltip(hidden.map((p) => `${p.animal}: ${petLabel(p)}`).join("\n"))

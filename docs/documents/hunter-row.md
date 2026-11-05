@@ -1,6 +1,6 @@
 # Hunter row (layout F)
 
-**Status:** built in Pets ticket 04; the Pet icon line in ticket 05. Design: layout **F** in `docs/records/2026-11-05-hunter-row.html`. Vocabulary follows `GLOSSARY.md` (Hunter, Class, Rank, Stamina, Needs help).
+**Status:** built in Pets ticket 04; the Pet icon line in ticket 05, its Needs help frame in ticket 06. Design: layout **F** in `docs/records/2026-11-05-hunter-row.html`. Vocabulary follows `GLOSSARY.md` (Hunter, Class, Rank, Stamina, Needs help).
 
 How a Hunter row in the sidebar gets its data and how it is drawn. Pane headers and tab pills read the same Hunter but draw it their own way. Layout F didn't change them.
 
@@ -29,7 +29,7 @@ How a Hunter row in the sidebar gets its data and how it is drawn. Pane headers 
 - **Line 2:** the grade tag and the model. On the right: used/total context tokens, then the 44 px Stamina bar. The bar shows what's **left**; the number shows what's **used**.
 - **No data:** `STA —` and no number.
 - **Needs help:** the row keeps its 2 px peach frame and peach tint.
-- **Pets** (only when the Hunter has any): a third line of 18 px animal icons, at most 2, then `[+N]`. See `pet-tracking-hooks.md` for where Pets come from.
+- **Pets** (only when the Hunter has any): a third line of 18 px animal icons, at most 2 (Needs help first, then Hunting, then oldest), then `[+N]`. A Pet that Needs help gets a 2 px peach frame. See `pet-tracking-hooks.md` for where Pets come from.
 
 ## Data flow
 
@@ -70,7 +70,7 @@ flowchart LR
   - Indented 46 px (the 38 px face and the 8 px gap), 3 px below the lines, icons 3 px apart.
   - Each icon is an 18 px `div` with a 1 px `border` frame on canvas, holding the animal's 38 px `art/animals/<Animal>/Faceset.png` scaled to 16 px. Its tooltip is `type · description`. A click runs `agent.focus` for the Hunter's terminal and stops there, so the row's own click doesn't run too.
   - `[+N]` is 12 px `dim`, 2 px further on. Its tooltip lists the hidden Pets, one per line: `Animal: type · description`.
-  - Ticket 06 adds the 2 px peach frame for a Pet that Needs help.
+  - A Pet that Needs help has a `FRAME` (2 px) `blocked` (peach) frame instead, with the face scaled to 14 px to fit. Its tooltip, and its line in the `[+N]` tooltip, start with `Needs help · `. Needs help Pets come first, so the shown pair always includes them.
 - **Line 1:**
   - The name `div` truncates but doesn't grow.
   - The dim text is `flex_1` and truncates first.
