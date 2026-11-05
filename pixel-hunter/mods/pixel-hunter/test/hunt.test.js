@@ -160,3 +160,29 @@ test("sparse input (no tabs, no terminals, missing fields) still gives a complet
   assert.deepEqual(state.classes, { x: "Knight" });
   assert.equal(hunt().areas.length, 0);
 });
+
+test("the arena shows at most four Hunters, most urgent first, and +N for the rest", () => {
+  const a = space();
+  const statuses = ["idle", "done", "working", "idle", "blocked", "working", "done"];
+  const panes = statuses.map((status, i) => agent(a, `a${i}`, { status }));
+  const [area] = hunt({ spaces: [a], panes, home: HOME }).areas;
+  // Needs help, then Hunting (in tab order), then Cleared; Resting and one Cleared are left out
+  assert.deepEqual(area.arena.hunters.map((h) => h.terminal), ["a4", "a2", "a5", "a1"]);
+  assert.equal(area.arena.more, 3);
+  assert.equal(area.hunters.length, 7, "the Area list still shows every Hunter");
+
+  const few = hunt({ spaces: [a], panes: panes.slice(0, 2), home: HOME }).areas[0].arena;
+  assert.deepEqual(few.hunters.map((h) => h.state), ["cleared", "resting"]);
+  assert.equal(few.more, 0);
+
+  const none = hunt({ spaces: [a], panes: [shell(a)], home: HOME }).areas[0].arena;
+  assert.deepEqual(none, { hunters: [], more: 0 });
+});
+
+test("each space has its own arena map and Monster", () => {
+  const spaces = [space({ active: false }), space({ active: true })];
+  const { areas } = hunt({ spaces, home: HOME });
+  const current = areas.find((x) => x.current);
+  assert.equal(current.map.id, "desert");
+  assert.equal(current.monster.name, "Demon Cyclops");
+});

@@ -14,12 +14,15 @@
 //   now     ms, passed in, never read here (HP and staleness use it in later tickets)
 //
 // Output:
-//   areas   [{ id, index, name, named, current, map, monster, worst, path, branch, key, hunters }]
+//   areas   [{ id, index, name, named, current, map, monster, worst, path, branch, key, hunters, arena }]
 //           map     { id: "forest", name: "Forest", monsters: [...] }
 //           monster { id: "GiantRacoon", name: "Giant Racoon" }  (the pack's sprite folder)
 //           worst   the worst hunt state in the Party, or null with no Hunters
 //           path    the first terminal's folder for display ("~/code/x", shortened when long)
 //           branch  that terminal's git branch, null outside git
+//           arena   { hunters, more }: up to ARENA_MAX Hunters for the arena, most urgent first
+//                   (Needs help, Hunting, Cleared, Resting; ties keep their order), and how
+//                   many more there are (shown as "+N")
 //   hunters [{ terminal, pane, tab, cls, state, status, program, branch, focused }]
 //           cls     { name: "Knight", sprite: "Knight" }
 //           state   "hunting" | "help" | "cleared" | "resting"
@@ -52,6 +55,9 @@ export const STATES = {
   resting: { label: "Resting", icon: "z", color: "dim" },
 };
 export const PRIORITY = ["help", "hunting", "cleared", "resting"];
+
+/** How many Hunters the arena shows; the rest are counted as "+N". */
+export const ARENA_MAX = 4;
 
 const FROM_STATUS = { working: "hunting", blocked: "help", done: "cleared", idle: "resting" };
 
@@ -104,6 +110,16 @@ export function keyLabel(key) {
   if (typeof key !== "string" || !key) return null;
   const mods = { ctrl: "⌃", cmd: "⌘", alt: "⌥", shift: "⇧" };
   return key.split("-").map((k) => mods[k] ?? k.toUpperCase()).join("");
+}
+
+/** The Hunters the arena shows, most urgent first (stable), and how many are left out. */
+export function arenaPick(hunters, max = ARENA_MAX) {
+  const rank = (h) => {
+    const i = PRIORITY.indexOf(h.state);
+    return i < 0 ? PRIORITY.length : i;
+  };
+  const sorted = hunters.map((h, i) => ({ h, i })).sort((a, b) => rank(a.h) - rank(b.h) || a.i - b.i).map(({ h }) => h);
+  return { hunters: sorted.slice(0, max), more: Math.max(0, sorted.length - max) };
 }
 
 // The panes of a space in tab order, then their own order.
@@ -175,6 +191,7 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       branch,
       key: typeof keys[index + 1] === "string" ? keys[index + 1] : null,
       hunters,
+      arena: arenaPick(hunters),
     };
   });
 

@@ -28,3 +28,19 @@ Files are copied pixel-exact, unchanged, at their pack paths:
 | `boss/GiantFrog/Faceset.png` | `Actor/Boss/GiantFrog/Faceset.png` | Lakeside: Giant Frog |
 
 All facesets are 38×38 px.
+
+Added for the arena (ticket 04), same zip, copied pixel-exact and unchanged:
+
+| Here | In the pack | Used as |
+| --- | --- | --- |
+| `chars/<Char>/Idle.png`, `Attack.png`, `Item.png`, `Jump.png` | `Actor/Character/<Char>/SeparateAnim/<same>.png` | arena poses for the six Classes (64x16 strips, directions down/up/left/right; Item is 16x16) |
+| `boss/<Boss>/Idle.png` (Frog: `Idle40x40.png`) | `Actor/Boss/<Boss>/<same>` | Monster Idle strips: Racoon 6x60, Cyclop 5x50, Spirit 5x50, Tengu 6x68, Red Samurai 12x48, Frog 5x40 |
+| `tiles/TilesetNature.png`, `TilesetField.png`, `TilesetFloor.png`, `TilesetFloorDetail.png`, `TilesetWater.png`, `TilesetDungeon.png` | `Backgrounds/Tilesets/<same>` | sources for the arena backgrounds |
+
+Made from those by `tools/build-art.py` (derived, still CC0):
+
+- `arena/<map>.png`: the six 160x96 arena backgrounds composed from the tilesets,
+  then desaturated and darkened toward the canvas `#101a24`.
+- `x4/...`: nearest-neighbour 4x copies of the arenas (`x4/arena/<map>-v<N>.png`),
+  the sprite strips above and the Monster facesets, so they stay crisp when drawn
+  at 2x (GPUI scales images smoothly).
