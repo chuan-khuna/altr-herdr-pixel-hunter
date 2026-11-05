@@ -1,7 +1,7 @@
 // The hunt model, snapshot in and view model out. Run: node --test mods/pixel-hunter/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS, paneFrame } from "../hunt.js";
+import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS, paneFrame, toggleArea } from "../hunt.js";
 import { readFileSync } from "node:fs";
 
 const HOME = "/Users/me";
@@ -469,4 +469,70 @@ test("pane headers get the Hunter, its own folder and branch; shells and mod pan
   assert.deepEqual([sh.hunter, sh.program, sh.path, sh.branch], [null, "zsh", "/tmp", null]);
   const mod = by["p-mod"];
   assert.deepEqual([mod.hunter, mod.terminal, mod.path, mod.branch, mod.frame], [null, null, null, null, null]);
+});
+
+// Ticket 08: Area expand and collapse.
+const expanded = (areas) => Object.fromEntries(areas.map((a) => [a.id, a.expanded]));
+
+test("by default only the current Area and an Area with a Hunter that Needs help are expanded", () => {
+  const a = space({ id: "a", active: true }), b = space({ id: "b" }), c = space({ id: "c" }), d = space({ id: "d" });
+  const panes = [agent(a, "a1"), agent(b, "b1", { status: "working" }), agent(c, "c1", { status: "blocked" }), shell(d)];
+  const { areas, state } = hunt({ spaces: [a, b, c, d], panes, home: HOME });
+  assert.deepEqual(expanded(areas), { a: true, b: false, c: true, d: false });
+  assert.deepEqual(areas.map((x) => x.held), [false, false, true, false]);
+  assert.deepEqual(state.collapsed, {}, "a default is not a choice: nothing is persisted");
+});
+
+test("a choice by hand wins over the default, both ways, and only the clicked Area changes", () => {
+  const a = space({ id: "a", active: true }), b = space({ id: "b" });
+  const panes = [agent(a, "a1"), agent(b, "b1")];
+  const first = hunt({ spaces: [a, b], panes, home: HOME });
+  let state = toggleArea(first.state, first.areas[0]); // collapse the current one
+  state = toggleArea(state, first.areas[1]); // expand the other
+  assert.deepEqual(state.collapsed, { a: true, b: false });
+  assert.deepEqual(state.monsters, first.state.monsters, "the rest of the state is kept");
+  const next = hunt({ spaces: [a, b], panes, home: HOME, state });
+  assert.deepEqual(expanded(next.areas), { a: false, b: true });
+  // switching spaces doesn't undo a choice
+  const moved = hunt({ spaces: [{ ...a, active: false }, { ...b, active: true }], panes, home: HOME, state: next.state });
+  assert.deepEqual(expanded(moved.areas), { a: false, b: true });
+  // a second click goes back
+  const again = hunt({ spaces: [a, b], panes, home: HOME, state: toggleArea(next.state, next.areas[0]) });
+  assert.deepEqual(expanded(again.areas), { a: true, b: true });
+});
+
+test("a manual collapse survives a restart through JSON, and nothing is lost while Herdr starts", () => {
+  const a = space({ id: "a", active: true }), b = space({ id: "b" });
+  const panes = [agent(a, "a1"), agent(b, "b1")];
+  const first = hunt({ spaces: [a, b], panes, home: HOME });
+  const saved = JSON.parse(JSON.stringify(toggleArea(first.state, first.areas[0])));
+  const empty = hunt({ spaces: [], panes: [], home: HOME, state: saved });
+  assert.deepEqual(empty.state.collapsed, { a: true });
+  const after = hunt({ spaces: [a, b], panes, home: HOME, state: JSON.parse(JSON.stringify(empty.state)) });
+  assert.deepEqual(expanded(after.areas), { a: false, b: false });
+  assert.deepEqual(after.state.collapsed, { a: true });
+});
+
+test("Needs help opens an Area even after a manual collapse; the chevron can't close it meanwhile", () => {
+  const a = space({ id: "a", active: true }), b = space({ id: "b" });
+  const calm = [agent(a, "a1"), agent(b, "b1", { status: "working" })];
+  const first = hunt({ spaces: [a, b], panes: calm, home: HOME, state: { collapsed: { b: true } } });
+  assert.equal(first.areas[1].expanded, false);
+  const help = [agent(a, "a1"), agent(b, "b1", { status: "blocked" })];
+  const urgent = hunt({ spaces: [a, b], panes: help, home: HOME, state: first.state });
+  assert.equal(urgent.areas[1].expanded, true);
+  assert.equal(urgent.areas[1].held, true);
+  assert.equal(toggleArea(urgent.state, urgent.areas[1]), urgent.state, "a click while held changes nothing");
+  assert.deepEqual(urgent.state.collapsed, { b: true }, "the choice is kept for after");
+  const later = hunt({ spaces: [a, b], panes: calm, home: HOME, state: urgent.state });
+  assert.equal(later.areas[1].expanded, false, "once help is given, the manual collapse is back");
+});
+
+test("choices of closed spaces are dropped; bad saved choices are ignored", () => {
+  const a = space({ id: "a" });
+  const state = { collapsed: { a: "yes", gone: true } };
+  const { areas, state: next } = hunt({ spaces: [a], panes: [agent(a, "a1")], home: HOME, state });
+  assert.equal(areas[0].expanded, false);
+  assert.deepEqual(next.collapsed, {});
+  assert.deepEqual(hunt({ spaces: [a], home: HOME, state: { collapsed: "bad" } }).state.collapsed, {});
 });

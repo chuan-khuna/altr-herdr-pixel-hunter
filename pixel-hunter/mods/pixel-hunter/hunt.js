@@ -25,7 +25,7 @@
 //
 // Output:
 //   areas   [{ id, index, name, named, current, map, monster, worst, path, branch, key, hunters, arena,
-//              tabs, hp, mode, wearing }]
+//              tabs, hp, mode, wearing, expanded, held }]
 //           map     { id: "forest", name: "Forest", monsters: [...] }
 //           monster { id: "GiantRacoon", name: "Giant Racoon" }  (the pack's sprite folder)
 //           worst   the worst hunt state in the Party, or null with no Hunters
@@ -40,6 +40,10 @@
 //                   still saying done); it stays Slain until someone Hunts again (Respawn
 //                   with full HP); else "idle"
 //           wearing true while HP is wearing down (mode "hit"); see hpAfter()
+//           expanded whether its Hunters are listed under it (the chevron ▾, else ▸): a choice
+//                   made by hand (state.collapsed) wins over the default (open when current,
+//                   closed otherwise), but an Area with a Hunter that Needs help always opens
+//           held    true while Needs help holds it open, so the chevron can't close it
 //           tabs    [{ id, index, lead, worst, hunters }] in tab order, for the tab bar: lead is the
 //                   tab's first Hunter in pane order (its face), or null with no agent (a map
 //                   icon); worst its most urgent hunt state (the dot), or null; hunters how many
@@ -59,7 +63,9 @@
 //           without one; branch its own git branch, null outside git; frame "help" (peach)
 //           when its Hunter Needs help, else "focus" (mint) when it has the keyboard, else null
 //   state   the next persisted state: { ...state, classes: { [terminal]: "Knight" },
-//           monsters: { [spaceId]: { hp, since, slain } } }
+//           monsters: { [spaceId]: { hp, since, slain } }, collapsed: { [spaceId]: true | false } }
+//           collapsed holds only choices made by hand (true: collapsed, false: expanded);
+//           toggleArea() makes one. Records of closed spaces go, as for monsters.
 //           A Monster record changes only when its Party starts or stops Hunting, is Slain or
 //           Respawns: `hp` is its HP at `since` (ms, while wearing) or for good (since null),
 //           so the state isn't rewritten on every render, and a restart picks up where it was.
@@ -299,6 +305,24 @@ function staminaOf(rec, table, now) {
   return { percent, level: staminaLevel(percent), stale, staleAt: stale ? null : staleAt };
 }
 
+// An Area's expansion: Needs help always opens it; else a choice by hand (true: collapsed,
+// false: expanded) wins over the default, which opens only the current Area.
+export function areaExpanded({ current, help, collapsed }) {
+  if (help) return true;
+  if (typeof collapsed === "boolean") return !collapsed;
+  return !!current;
+}
+
+/** The next persisted state after the chevron of `area` (an output Area) is clicked: the
+ *  opposite of what it shows now, remembered for that space. While Needs help holds it open
+ *  nothing changes (the click would show nothing, and a close later would surprise). */
+export function toggleArea(state, area) {
+  state = state && typeof state === "object" ? state : {};
+  if (!area || area.id == null || area.held) return state;
+  const collapsed = state.collapsed && typeof state.collapsed === "object" ? state.collapsed : {};
+  return { ...state, collapsed: { ...collapsed, [area.id]: !!area.expanded } };
+}
+
 function monsterView(r, now) {
   const wearing = r.since != null;
   return {
@@ -324,6 +348,8 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
   const oldMonsters = state.monsters && typeof state.monsters === "object" ? state.monsters : {};
   // Records of closed spaces go, but not while Herdr lists no spaces at all (still starting).
   const monsters = spaces.length ? {} : { ...oldMonsters };
+  const oldCollapsed = state.collapsed && typeof state.collapsed === "object" ? state.collapsed : {};
+  const collapsed = spaces.length ? {} : { ...oldCollapsed };
   const paneViews = [];
 
   const areas = spaces.map((s, index) => {
@@ -350,6 +376,8 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       };
     });
     const byTerminal = new Map(hunters.map((h) => [h.terminal, h]));
+    const help = hunters.some((h) => h.state === "help");
+    if (typeof oldCollapsed[s.id] === "boolean") collapsed[s.id] = oldCollapsed[s.id];
     for (const p of ps) {
       const hunter = (p.terminal && byTerminal.get(p.terminal)) || null;
       paneViews.push({
@@ -380,11 +408,13 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       hunters,
       arena: arenaPick(hunters),
       tabs: tabsOf(s.tabs, hunters),
+      expanded: areaExpanded({ current: !!s.active, help, collapsed: collapsed[s.id] }),
+      held: help,
       ...monsterView((monsters[s.id] = monsterStep(oldMonsters[s.id], agentsOf(ps).map((p) => ({
         state: huntState(p.status), done: p.status === "done" || p.report === "done",
       })), now)), now),
     };
   });
 
-  return { areas, panes: paneViews, state: { ...state, classes, monsters } };
+  return { areas, panes: paneViews, state: { ...state, classes, monsters, collapsed } };
 }

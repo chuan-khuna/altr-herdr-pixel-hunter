@@ -1,7 +1,7 @@
 // The one place that reads Herdr for the hunt model: builds the snapshot, runs hunt(),
 // and keeps the persisted part in shared state (on disk, the same for every copy).
 import { spaces, panes, terminals, keys, home, shared, setShared, props } from "herdr";
-import { hunt, keyLabel } from "./hunt.js";
+import { hunt, keyLabel, toggleArea } from "./hunt.js";
 import { DEMO, demoSessions } from "./demo.js";
 
 export const STATE_KEY = "pixel-hunter.state";
@@ -19,6 +19,15 @@ function spaceKeys() {
 }
 
 // `self`: the role's View, holding the session records and grade table (sessions.js).
+// The chevron: remember the opposite of what `area` (from world()) shows now, for its space.
+// Not in demo mode (the snapshot is never persisted).
+export function toggleExpanded(area) {
+  if (props()?.demo) return;
+  const state = shared(STATE_KEY) ?? {};
+  const next = toggleArea(state, area);
+  if (next !== state) setShared(STATE_KEY, next);
+}
+
 export function world(self, now = Date.now()) {
   if (props()?.demo) return hunt({ ...DEMO, sessions: demoSessions(now), ranks: self?.ranks ?? null, now }); // a screenshot snapshot, never persisted
   const state = shared(STATE_KEY) ?? {};

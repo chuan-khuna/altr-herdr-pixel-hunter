@@ -1,11 +1,13 @@
 // The Area list: every space as an Area (two lines), its Hunters underneath.
-// Area head: click selects the space, right-click opens its menu, drag reorders.
+// Area head: click selects the space, right-click opens its menu, drag reorders. Its chevron
+// (▾ open, ▸ closed) shows or hides the Hunters and keeps the press, so it never selects.
 // Hunter row: click focuses its agent.
-import { div, image } from "gpui-kit";
+import { div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { run, openOverlay } from "herdr";
 import { STATES, HP_MAX } from "./hunt.js";
 import { FRAME } from "./theme.js";
+import { toggleExpanded } from "./world.js";
 
 const ART = "mods/pixel-hunter/art";
 export const monsterFace = (m) => `${ART}/boss/${m.id}/Faceset.png`;
@@ -81,7 +83,7 @@ function areaHead(self, area, model, c) {
     })
     .on_mouse_down("right", () => openOverlay({ mod: "menu", kind: "popup", width: 200, height: 260, props: { tab: "space", target: { id: area.id } } }))
     .child(h_flex().gap(8).items_center()
-      .child(div().w(10).flex_none()) // the expand chevron's place (ticket 08)
+      .child(chevron(self, area, c))
       .child(monsterFaceBox(area.monster, c))
       .child(v_flex().flex_1().min_w(0).gap(2)
         .child(h_flex().gap(8).items_center().min_w(0)
@@ -98,6 +100,25 @@ function areaHead(self, area, model, c) {
         // line 3: the Monster's HP, under the path (the 76 px face leaves room, and line 1
         // keeps its width for the name)
         .child(div().mt(3).child(hpBar("row", area, HP_ROW_W, c)))));
+}
+
+// ▾ / ▸ (pixel icons: Pixelify Sans has no such glyphs) in the Area's 10 px left column, the column's full height so it's easy to hit. It
+// stops its own press and release, so the head neither selects the space nor starts a drag;
+// a release here after a press elsewhere (a drag) passes on, so dropping on it still moves.
+// Held open by Needs help it can't close (dim, with a tooltip saying why).
+function chevron(self, area, c) {
+  return div().id(`ph-chev-${area.id}`).w(10).h(MONSTER_FACE).flex_none().flex().items_center()
+    .text_color(c.dim)
+    .when(!area.held, (el) => el.cursor_pointer().hover((s) => s.text_color(c.foreground)))
+    .when(area.held, (el) => el.opacity(0.5).tooltip("Needs help keeps this Area open"))
+    .on_mouse_down("left", (_e, cx) => { cx.stop_propagation(); self.chevPressed = area.id; })
+    .on_mouse_up("left", (_e, cx) => {
+      if (self.chevPressed !== area.id) return;
+      cx.stop_propagation();
+      self.chevPressed = null;
+      toggleExpanded(area);
+    })
+    .child(svg(`mods/pixel-hunter/icons/chevron-${area.expanded ? "open" : "closed"}.svg`).size(10).flex_none());
 }
 
 function hunterRow(h, c) {
@@ -142,10 +163,13 @@ export function staminaView(st, c) {
 
 export function areaList(self, model, c) {
   return v_flex().id("ph-areas").flex_1().min_h(0).overflow_y_scrollbar()
-    .on_mouse_up("left", (_e, cx) => { if (self.drag?.pressed) { self.drag.pressed = null; self.drag.over = null; cx.notify(); } })
+    .on_mouse_up("left", (_e, cx) => {
+      self.chevPressed = null;
+      if (self.drag?.pressed) { self.drag.pressed = null; self.drag.over = null; cx.notify(); }
+    })
     .children(model.areas.map((area) =>
       v_flex().id(`ph-areabox-${area.id}`).flex_none().pt(8).px(10).pb(10).border_b(FRAME).border_color(c.border)
         .when(area.current, (el) => el.bg(c.selected))
         .child(areaHead(self, area, model, c))
-        .children(area.hunters.map((h) => hunterRow(h, c)))));
+        .when(area.expanded, (el) => el.children(area.hunters.map((h) => hunterRow(h, c))))));
 }
