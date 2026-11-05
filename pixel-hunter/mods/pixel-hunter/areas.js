@@ -1,4 +1,4 @@
-// The Area list: every space as an Area (two lines), its Hunters underneath.
+// The Area list: every space as an Area (its face beside three lines), its Hunters underneath.
 // Area head: click selects the space, right-click opens its menu, drag reorders. Its chevron
 // (▾ open, ▸ closed) shows or hides the Hunters and keeps the press, so it never selects.
 // Hunter row: click focuses its agent.
@@ -31,7 +31,7 @@ export function smallFace(cls) {
 }
 
 // The Monster's face in an Area row: the 38 px faceset at 2x (76 px, twice a Hunter
-// face), spanning both lines. The frame covers its outer art pixel all round.
+// face), spanning all three lines. The frame covers its outer art pixel all round.
 export const MONSTER_FACE = 76;
 function monsterFaceBox(m, c) {
   return div().relative().w(MONSTER_FACE).h(MONSTER_FACE).flex_none().overflow_hidden()
@@ -43,8 +43,8 @@ function monsterFaceBox(m, c) {
 // non-joiner after each f keeps the letters apart. For every name, path and branch shown.
 export const plain = (text) => String(text ?? "").replace(/f(?=[filt])/g, "f\u200c");
 
-// The Monster's HP bar, drawn the same in the arena and in the Area row from the same
-// `area.hp`, so they agree: a 2 px framed groove on canvas with an `hp` fill. A change
+// The Monster's HP bar, drawn in the arena only (the Area row leaves it out) from `area.hp`:
+// a 2 px framed groove on canvas with an `hp` fill. A change
 // (wear on each redraw, the drain when Slain, the refill on Respawn) slides in HP_SLIDE_MS.
 export const HP_SLIDE_MS = 600;
 export function hpBar(key, area, width, c) {
@@ -57,8 +57,6 @@ export function hpBar(key, area, width, c) {
 
 export const stateColor = (c, state) => c[STATES[state]?.color] ?? c.dim;
 export const stateText = (state) => `${STATES[state].icon} ${STATES[state].label}`;
-
-export const HP_ROW_W = 64;
 
 function areaHead(self, area, model, c) {
   const drag = self.drag ?? (self.drag = { pressed: null, over: null });
@@ -85,22 +83,21 @@ function areaHead(self, area, model, c) {
     .child(h_flex().gap(8).items_center()
       .child(chevron(self, area, c))
       .child(monsterFaceBox(area.monster, c))
-      .child(v_flex().flex_1().min_w(0).gap(2)
-        .child(h_flex().gap(8).items_center().min_w(0)
-          .child(div().min_w(0).flex_shrink(1).truncate().font_semibold().text_color(c.foreground).child(plain(area.name)))
-          .child(div().flex_none().text_color(c.dim).child(`· ${area.map.name}`))
-          .child(div().flex_1())
-          .child(div().size(8).flex_none().bg(area.worst ? stateColor(c, area.worst) : c.border))
+      // three lines, each a third of the face's height (as the record's grid rows): name with
+      // the worst-state dot and ⌃N, then path, then branch (empty outside git). The map name
+      // and HP live in the arena only.
+      .child(v_flex().flex_1().min_w(0).h(MONSTER_FACE)
+        .child(areaLine().gap(8)
+          .child(div().min_w(0).flex_1().truncate().font_semibold().text_color(c.foreground).child(plain(area.name)))
+          .child(div().size(8).flex_none().bg(area.worst ? stateColor(c, area.worst) : c.dim))
           .when(Boolean(area.key), (el) => el.child(div().flex_none().text_size(13).text_color(c.dim).child(area.key))))
-        .child(h_flex().min_w(0).text_size(13).text_color(c.dim)
-          .child(div().flex_none().child(plain(area.path)))
-          .when(Boolean(area.branch), (el) => el
-            .child(div().flex_none().child(" · "))
-            .child(div().min_w(0).truncate().text_color(c.foreground).child(plain(area.branch)))))
-        // line 3: the Monster's HP, under the path (the 76 px face leaves room, and line 1
-        // keeps its width for the name)
-        .child(div().mt(3).child(hpBar("row", area, HP_ROW_W, c)))));
+        .child(areaLine().text_size(13).text_color(c.dim)
+          .child(div().min_w(0).truncate().child(plain(area.path))))
+        .child(areaLine().text_size(13).text_color(c.foreground)
+          .when(Boolean(area.branch), (el) => el.child(div().min_w(0).truncate().child(`⎇ ${plain(area.branch)}`))))));
 }
+
+const areaLine = () => h_flex().flex_1().min_w(0).items_center();
 
 // ▾ / ▸ (pixel icons: Pixelify Sans has no such glyphs) in the Area's 10 px left column, the column's full height so it's easy to hit. It
 // stops its own press and release, so the head neither selects the space nor starts a drag;

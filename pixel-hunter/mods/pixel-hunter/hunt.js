@@ -33,8 +33,10 @@
 //           map     { id: "forest", name: "Forest", monsters: [...] }
 //           monster { id: "GiantRacoon", name: "Giant Racoon" }  (the pack's sprite folder)
 //           worst   the worst hunt state in the Party, or null with no Hunters
-//           path    the first terminal's folder for display ("~/code/x", shortened when long)
-//           branch  that terminal's git branch, null outside git
+//           path    the first terminal's folder for display ("~/code/x", shortened when long);
+//                   while it has no cwd the space's folder, then home ("~"); never "undefined"
+//           branch  the git branch of that folder (the terminal's, or the space's), null
+//                   outside git
 //           arena   { hunters, more }: up to ARENA_MAX Hunters for the arena, most urgent first
 //                   (Needs help, Hunting, Cleared, Resting; ties keep their order), and how
 //                   many more there are (shown as "+N")
@@ -123,6 +125,9 @@ export function mapFor(index) {
 
 export const PATH_MAX = 30;
 
+// A path-like value as text: a non-blank string, else "" (Herdr can leave a cwd or folder out).
+const text = (v) => (typeof v === "string" && v.trim() ? v : "");
+
 // A Windows path: a drive ("C:\", "C:/", "C:") or a UNC share ("\\server\share"). Such paths, or
 // any path when home is one, split on both "\" and "/", match home ignoring case, and keep the
 // separator the path itself uses ("C:\Users\me\code" shows as "~\code"). Other paths are POSIX:
@@ -137,6 +142,8 @@ function pathStyle(path, home) {
 
 /** A folder for display: home as "~", and a long path cut to "head/…/tail" within `max` chars. */
 export function displayPath(path, home, max = PATH_MAX) {
+  path = text(path);
+  home = text(home);
   if (!path) return "~";
   const { win, sep, split } = pathStyle(path, home);
   let p, h;
@@ -154,6 +161,7 @@ export function displayPath(path, home, max = PATH_MAX) {
   const parts = p.split(split);
   let head, rest;
   if (win && parts[0] === "" && parts[1] === "") {
+    if (parts.length < 5) return p; // only "\\server\share": nothing after it to cut
     head = sep + sep + parts[2] + sep + parts[3]; // UNC: "\\server\share"
     rest = parts.slice(4);
   } else {
@@ -175,7 +183,7 @@ export function displayPath(path, home, max = PATH_MAX) {
 export function folderName(path, home) {
   const shown = displayPath(path, home, Infinity);
   if (shown === "~") return "~";
-  const { win, split } = pathStyle(path || "", home);
+  const { win, split } = pathStyle(text(path), text(home));
   if (win && /^[a-zA-Z]:[\\/]$/.test(shown)) return shown; // a drive root: "C:\"
   return shown.split(split).filter(Boolean).pop() ?? "~";
 }
@@ -420,9 +428,11 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
 
   const areas = spaces.map((s, index) => {
     const ps = perSpace[index];
-    const first = ps.find((p) => p.terminal && p.cwd) ?? null;
-    const where = first?.cwd || s.folder || home;
-    const branch = (first ? first.branch : s.branch) || null;
+    // The first terminal's folder and branch; while it has no cwd (just opened), the space's.
+    const first = ps.find((p) => p.terminal) ?? null;
+    const cwd = text(first?.cwd);
+    const where = cwd || text(s.folder) || text(home);
+    const branch = text(cwd ? first.branch : s.branch) || null;
     const map = mapFor(index);
     const hunters = agentsOf(ps).map((p) => {
       const program = p.program || "?";

@@ -106,6 +106,35 @@ test("the Area path and branch come from its first terminal, in tab order", () =
   assert.equal(area.branch, "feat/a");
 });
 
+test("with no cwd on the first terminal, the Area path falls back to the space folder, then home, never undefined", () => {
+  const s = space({ folder: `${HOME}/code/shop-api`, branch: "feat/login" });
+  const panes = [
+    shell(s, { pane: "p1", terminal: "t1", cwd: undefined, branch: undefined }),
+    shell(s, { pane: "p2", terminal: "t2", cwd: `${HOME}/elsewhere`, branch: "other" }),
+  ];
+  const [a] = hunt({ spaces: [s], panes, home: HOME }).areas;
+  assert.equal(a.path, "~/code/shop-api");
+  assert.equal(a.branch, "feat/login");
+
+  const t = space({ folder: undefined, branch: undefined });
+  const [b] = hunt({ spaces: [t], panes: [shell(t, { cwd: null, branch: null })], home: HOME }).areas;
+  assert.equal(b.path, "~");
+  assert.equal(b.branch, null);
+
+  // Odd values from Herdr: nothing here may print as "undefined" (or "null", "[object …]").
+  const odd = [undefined, null, "", 0, 42, {}, [], "   "];
+  for (const cwd of odd) for (const folder of odd) for (const home of [HOME, "C:\\Users\\me", undefined, null, ""]) {
+    const x = space({ name: "", folder });
+    const [area] = hunt({ spaces: [x], panes: [shell(x, { cwd })], home }).areas;
+    assert.equal(typeof area.path, "string");
+    assert.ok(area.path.length > 0);
+    assert.ok(!/undefined|null|object/.test(area.path), `${JSON.stringify({ cwd, folder, home })} → ${area.path}`);
+    assert.ok(!/undefined|null|object/.test(area.name), area.name);
+  }
+  assert.ok(!displayPath("\\\\server", "C:\\Users\\me", 5).includes("undefined"));
+  assert.ok(!displayPath("\\\\server\\share\\a-long-folder\\x", "C:\\Users\\me", 10).includes("undefined"));
+});
+
 test("Classes go in order of first appearance across the workspace and cycle after six", () => {
   const a = space(), b = space();
   const panes = [

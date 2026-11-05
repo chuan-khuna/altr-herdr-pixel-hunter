@@ -46,15 +46,16 @@ Left to right:
    - A **chevron** column, 10 px wide and 76 px tall, at the far left: a pixel ▾ (open) or
      ▸ (closed), 10 px, `dim`, `foreground` on hover.
    - The **Monster's face**: 76 px (its 38 px faceset at 2x), 2 px `border` frame, spanning
-     the Area's three lines.
-   - Line 1: the space name (semibold, truncated), `· Forest` (`dim`), then on the right
-     an 8 px square dot in the colour of the Party's most urgent state (`border` with no
-     Hunters), and the shortcut that selects the space from the person's `keys.json`
-     (`⌃1`, 13 px, `dim`).
-   - Line 2 (13 px, `dim`): the folder of the space's first terminal, `~` for home, cut to
-     `head/…/tail` past 30 characters, then `·` and its git branch in `foreground`. No
-     branch outside git.
-   - Line 3: the Monster's HP as a 64 px bar, drawn the same way as the arena's.
+     the Area's three lines. Each line takes a third of the face's height, centred. The
+     map name and HP bar are only in the arena, not in the row.
+   - Line 1: the space name (semibold, truncated), then on the right an 8 px square dot in
+     the colour of the Party's most urgent state (`dim` with no Hunters), and the shortcut
+     that selects the space from the person's `keys.json` (`⌃1`, 13 px, `dim`).
+   - Line 2 (13 px, `dim`, truncated): the folder of the space's first terminal, `~` for
+     home, cut to `head/…/tail` past 30 characters. While that terminal has no folder yet,
+     the space's own folder, then `~`; never `undefined`.
+   - Line 3 (13 px, `foreground`, truncated): `⎇ branch`, the git branch of that folder.
+     Empty outside git (the line keeps its height).
    - When open, the Area lists its **Hunter rows** under it, indented 16 px, 5 px apart,
      each with 6 x 4 px padding and an 8 px gap:
      - a 38 px Hunter face in a 2 px `border` frame;
@@ -238,7 +239,7 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
   `hunt({ spaces, panes, home, keys, state, sessions, ranks, pins, now }) -> { areas, panes, state }`.
   Maps, Monsters, Classes, states, arena pick, HP, Slain, Respawn, open or closed, Rank,
   Stamina and pins are all decided here, with time passed in. Tests: `node --test` in the
-  mod folder (`test/hunt.test.js`, `test/statusline.test.js`, 48 cases).
+  mod folder (`test/hunt.test.js`, `test/statusline.test.js`, 49 cases).
 - `world.js`: the only place that reads Herdr for the model (`spaces()`, `panes()`,
   `terminals()` for herdr-core's own `done`, `keys()`, `home()`). It keeps the model's
   state in `shared("pixel-hunter.state")`:
@@ -372,7 +373,7 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
 ## Done when
 
 - `herdr-app check ~/.config/herdr-app/mods/pixel-hunter` passes, and `node --test` in that
-  folder passes all 48 tests.
+  folder passes all 49 tests.
 - `layout.switch pixel-hunter` shows the 320 px sidebar (logo, arena, Area list), the 44 px
   tab bar and framed panes with 30 px Hunter headers; `herdr-app status` lists no errors.
 - `PIXEL HUNTER` is in Press Start 2P and the rest in Pixelify Sans; frames are square 2 px.
@@ -380,11 +381,10 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   76 px face; the arena shows the current Area's map and Monster.
 - A fake agent (a terminal printing `ESC ] 7501 ; state=working BEL`) appears as a Hunter
   with the next Class and `⚔ HUNTING`; the Monster idles and plays its Hit strip, shaking,
-  once every 5 s, and both
-  HP bars wear down together.
+  once every 5 s, and the arena's HP bar wears down.
 - `state=blocked`: the row and the pane header turn peach, the arena Hunter raises a hand
   under a blinking `!`, and its Area opens and can't be closed.
-- `state=done` with nobody else Hunting: `SLAIN`, both HP bars empty, the Monster sinks and
+- `state=done` with nobody else Hunting: `SLAIN`, the HP bar empty, the Monster sinks and
   fades. `state=working` again: it Respawns at full HP.
 - With nobody Hunting or Needing help, two shots a few seconds apart are identical.
 - Without the statusLine script every Hunter shows `?`, its program and `STA —`. Piping
