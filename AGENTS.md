@@ -28,6 +28,9 @@ Read its **Layouts**, **Mods** and **Share** sections before touching anything.
 - `scripts/sync.sh` copies the live layout, its `pixel-hunter*` themes and mods into
   `pixel-hunter/`. Run it before every commit. Drop generated files a fresh
   install recreates (`gpui-kit.d.ts`, `jsconfig.json`) if the script copies them.
+- The hunt model (`mods/pixel-hunter/hunt.js`, no Herdr imports) has tests:
+  `cd ~/.config/herdr-app/mods/pixel-hunter && node --test`. Run them after
+  every model change.
 
 ## Publishing checklist
 
