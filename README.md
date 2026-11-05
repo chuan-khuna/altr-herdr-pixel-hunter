@@ -89,13 +89,14 @@ shows as a **Pet**: a small animal icon on a line under its Hunter's row. A
 row shows at most 2, Needs help first, then Hunting, then oldest, then
 `[+N]`. Hovering an icon shows the subagent's type and the task its Hunter
 gave it, hovering `[+N]` lists the others, and clicking an icon focuses the
-Hunter's terminal. Pets are part of the Party: while one Hunts, the Monster's
+Hunter's terminal. In the arena the same 2 (and `[+N]`) stand at their
+Hunter's feet as little animals, hopping while they Hunt. Pets are part of the Party: while one Hunts, the Monster's
 HP keeps wearing down and it isn't Slain, even if its Hunter is Cleared or
 Resting.
 
 A subagent waiting for your permission **Needs help**: its icon gets a 2 px
-peach frame, it moves ahead of the Hunting Pets (so `[+N]` never hides it),
-and its Area's dot turns peach and the Area opens, as for a Hunter that Needs
+peach frame, its arena animal gets a blinking `!`, it moves ahead of the
+Hunting Pets (so `[+N]` never hides it), and its Area's dot turns peach and the Area opens, as for a Hunter that Needs
 help. Pane headers and tabs don't change: the prompt already shows in the
 Hunter's terminal.
 

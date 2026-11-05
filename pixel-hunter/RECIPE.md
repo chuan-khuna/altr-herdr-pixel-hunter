@@ -7,7 +7,8 @@ current Area's Hunters fight its Monster, then every Area with its Party underne
 each Hunter by its tab's name with its Class, a strip and icon for what it's doing
 (⚔ Hunting, ! Needs help, ✓ Cleared, z Resting), its model as a letter-graded Rank, and
 its context as used/total tokens beside a Stamina bar of what's left. Under a Hunter, its
-Claude Code subagents show as **Pets**, small animal icons. The tab bar and
+Claude Code subagents show as **Pets**, small animal icons, and in the arena as little
+animals at its feet. The tab bar and
 every pane header carry the Hunters' faces. Everything is drawn on a faded blue-cyan
 dark theme with square 2 px frames, Pixelify Sans and CC0 sprites from the Ninja
 Adventure pack. Whatever needs you is peach.
@@ -38,6 +39,15 @@ Left to right:
    - Up to **four Hunters** (16 px sprites drawn 32 px) stand on the left facing it, at
      (44, 52), (92, 70), (40, 104) and (88, 122), most urgent first. With more than four, a
      `+N` chip sits top-left (12 px text on canvas at 80% opacity).
+   - Each drawn Hunter's **Pets** (the first 2 of its Pet line's order) stand at its feet
+     as 16 px animals drawn 32 px, in front of it: top-left at (−16, +20) and (+16, +20)
+     from the Hunter's slot, so for the first slot (28, 72) and (60, 72). Each Hunter and
+     its Pets are drawn in slot order, so lower slots stand in front. With more than 2, a
+     `[+N]` chip (10 px text, 2 px side padding, canvas at 80% opacity) sits left of the
+     pair for the left-hand slots (−38, +36 from the slot) and right of it for the
+     right-hand ones (+46, +36), above every sprite. That keeps Pets and chips off the
+     Monster (its leftmost pixel is about x 162), the HP bar and the caption. Pets of
+     Hunters the arena doesn't draw aren't drawn.
    - Bottom-left, a caption `Desert · Demon Cyclops`, the map and the Area's current Monster
      (12 px, same chip style).
    - Bottom-right (right 12, bottom 8), the **HP bar**: 110 px wide, a 2 px `border`
@@ -139,13 +149,13 @@ current one.
 | `blocked` | Needs help | `! NEEDS HELP`, peach `#f3a787`, peach row frame, peach pane header | the Hunter's Item pose (hand raised) with a 20 px peach `!` blinking every 400 ms |
 | `working` | Hunting | `⚔ HUNTING`, blue `#7ca1c0` | swaps Idle and Attack every 520 ms, the Attack 6 px forward (a lunge) |
 | `done` | Cleared | `✓ CLEARED`, green `#6eaa78` | hops once (12 px up and down, 180 ms each way, Jump frame) when it turns Cleared, then idles |
-| `idle` | Resting | `z RESTING`, dim `#7e9e99` | idles with a 14 px dim `z` that floats up and fades over 2.4 s while anyone in the Area is Hunting or Needs help, and holds still otherwise |
+| `idle` | Resting | `z RESTING`, dim `#7e9e99` | idles with a 14 px dim `z` that floats up and fades over 2.4 s while anyone in the Area (a Hunter or a Pet) is Hunting or Needs help, and holds still otherwise |
 
 - The Area's dot, a tab's dot and the arena's order use the most urgent state: Needs
   help > Hunting > Cleared > Resting. The Area's dot also counts its Hunters' Pets (a
   Hunting Pet makes it blue, a Pet that Needs help peach); tab dots, pane headers and the
-  arena count Hunters only. The arena shows four Hunters picked that way (ties
-  keep their order) and `+N` for the rest.
+  arena's pick count Hunters only. The arena shows four Hunters picked that way (ties
+  keep their order) and `+N` for the rest; their Pets ride along.
 - Herdr shows `done` only until someone looks, then `idle`, so a Hunter you've seen
   finish reads Resting.
 
@@ -168,7 +178,7 @@ current one.
   Monsters, picked at random (never the one just Slain; the map's own can come back). It
   stands up at once in place of the fallen one, and stays that Area's Monster until its
   next Respawn.
-- With someone Needing help but nobody Hunting it idles (its Idle strip, 160 ms a frame);
+- With someone (a Hunter or a Pet) Needing help but nobody Hunting it idles (its Idle strip, 160 ms a frame);
   with everyone Resting or Cleared it stands still on its first frame. HP pauses.
 - HP, Slain and the current Monster are kept across restarts (Herdr's shared state).
 - With nobody Hunting or Needing help, no Stamina record about to go old and no Pet,
@@ -234,6 +244,10 @@ current one.
   does); hovering `[+N]` lists the hidden ones, one per line
   (`Frog: Explore · list the session cookies`). Clicking an icon focuses the Hunter's
   terminal (`agent.focus`).
+- In the arena the same 2 (and `[+N]`) stand at their Hunter's feet. A Hunting Pet swaps
+  its sprite sheet's two frames (stand, leap) every 320 ms; one that Needs help stands on
+  its first frame under a 16 px peach `!` blinking every 400 ms, like the Hunter's `!`.
+  Both are native loops and text frames, so Pets add no timer and no redraw.
 - A Pet leaves when its subagent stops or its task ends, when its Hunter's terminal closes
   or stops being an agent, when its record's `app` isn't the pane's, or once it hasn't
   reported for `petStaleAfterSeconds` (120, in `rank.json`), dropped at exactly that
@@ -353,8 +367,9 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
 - `tools/build-art.py` (Python 3 + Pillow, run from the mod folder): composes the six
   `art/arena/<map>.png` from `art/tiles/` (keeps 55% of the saturation, then mixes 36%
   toward `#101a24`; Desert 30% / 50%, Ruins 20% / 70%) and writes `art/x4/`, nearest-
-  neighbour 4x copies of the arenas (`x4/arena/<map>-v1.png`), Hunter and Monster strips
-  and Monster facesets. Re-runnable and pixel-exact.
+  neighbour 4x copies of the arenas (`x4/arena/<map>-v1.png`), Hunter and Monster strips,
+  Monster facesets and the animals' sprite sheets (`x4/animals/<Animal>/SpriteSheet.png`).
+  Re-runnable and pixel-exact.
 
 **`herdr` functions used**: `props`, `spaces`, `panes`, `terminals`, `keys`, `home`,
 `shared`, `setShared`, `run`, `openOverlay`, `window`, `layout`, `settings`, `theme`,
@@ -391,7 +406,7 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   their lowest opaque pixel): Racoon 55 (Attack 60), Cyclop 43, Spirit 48, Tengu 51 (Hit
   60), Red Samurai 44 (Hit 46), Frog 33.
 - `animals/<Animal>/Faceset.png` (38 x 38, the Pet icons) and `SpriteSheet.png` (32 x 16,
-  two 16 x 16 frames, for the arena later) for Cat, Dog, Dog2, Cub (the pack's LionCub),
+  two 16 x 16 frames, stand and leap, facing right; the arena draws its x4 copy) for Cat, Dog, Dog2, Cub (the pack's LionCub),
   Frog, Racoon, Monkey (Brown), Chicken (White), Pig (Pink) and Fish (Red). Cow, Horse and
   Lion are left out.
 - `tiles/`: TilesetNature, TilesetField, TilesetFloor, TilesetFloorDetail, TilesetWater,
@@ -426,8 +441,19 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   `SubagentStop`, `PermissionRequest` and `PostToolUse` hooks in the person's own Claude Code settings (the README has the
   block; the mod never edits it), and `node` on PATH. The `subagentStatusLine` ticks
   every 5 s on its own while Claude Code's agent panel has a row; it doesn't need the
-  statusLine's `refreshInterval`. A Pet that hasn't reported for 2 minutes
-  (`petStaleAfterSeconds`) leaves, so a crashed session can't keep a Monster alive.
+  statusLine's `refreshInterval`. Without the setup no Pet shows anywhere, the arena
+  included. A Pet that hasn't reported for 2 minutes (`petStaleAfterSeconds`, 120 in
+  `rank.json`) leaves the row and the arena, so a crashed session can't keep a Monster
+  alive; one that Needs help never leaves that way.
+- **The arena is crowded.** The four Hunter slots are only 16 to 20 px apart, so Pets
+  stand in front of their Hunter's feet (covering the bottom few px of its legs) and the
+  `[+N]` chip goes beside the pair, not under it: under the pair it would sit on the next
+  Hunter's head, and under the fourth slot on the caption. On the right-hand slots it ends
+  just short of the widest Monster frame (the Red Warlord's Hit, shaking).
+- **Pets animate the way Hunters do**: two frames under two opacity loops (`before` /
+  `after` 0.5 of a 640 ms loop), the `!` with `.frames(["!", " "], 400)`. No timer; and a
+  Pet that Hunts or Needs help also wakes the Resting `z` and the Monster's idle, as a
+  Hunter would.
 - **Pet Needs help has no heartbeat.** Claude Code sends no status-line tick while a
   permission prompt is open (114 s seen), so a Pet that Needs help is never dropped as
   stale, and a tick is what proves the prompt closed. `PostToolUse` fires for every tool
@@ -466,7 +492,7 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   frames are bands of that last stretch, so the phase rising then falling plays them there
   and back; the Idle strip shows the rest of the time. Loops built in one render share
   their phase, which keeps the Hit frames in step with the show/hide.
-- Limits: two Pet icons per Hunter, four Hunters in the arena, six Classes and six maps before they repeat, 256
+- Limits: two Pets per Hunter in its row and two in the arena, four Hunters in the arena, six Classes and six maps before they repeat, 256
   session records, paths 30 characters in Area rows and 48 in pane headers, tab names
   170 px.
 - Windows paths (`C:\Users\me\code\x`) show with their own separator, home matched
@@ -502,9 +528,16 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   icons and `[+2]` under its row, the count drops as they finish, and the line goes when
   the last one does. A record whose `seenAt` is 110 s old disappears about 10 s later
   on its own.
+- In the arena the same Hunter has the 2 animals at its feet, swapping two frames, and a
+  `[+2]` chip beside them; shots back to back show the frames change about every 320 ms.
+  The `demo: true` snapshot shows login's Dog and Cat with `[+3]`, cart's Frog under a
+  blinking peach `!` and docs' Dog2, none of them over the Monster, HP bar or caption.
+- With the Hunter Resting and no Pet, 70 shots of the arena back to back over 2 s are
+  identical.
 - With the Pets setup, a subagent's permission prompt gives its icon a 2 px peach frame
   and moves it into the shown pair; approving it (the subagent runs the tool) brings the
-  1 px frame back, and so does denying it, at the next tick. A hand-written record with
+  1 px frame back, and so does denying it, at the next tick. While it Needs help its
+  arena animal stands still under a blinking `!`. A hand-written record with
   `"state": "help"` under a Hunting Hunter in another Area turns that Area's dot peach
   and opens it, and stays past 2 minutes without a heartbeat.
 - `{ "tabs": { "<a named tab>": "Samurai" } }` in `classes.json` turns that tab's Hunter

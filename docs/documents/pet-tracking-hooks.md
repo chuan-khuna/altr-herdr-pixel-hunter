@@ -1,6 +1,6 @@
 # Pet tracking: Claude Code hooks
 
-**Status:** partly built. Ticket 05 built `pets.mjs` `start`, `stop` and `tasks`, the folder watcher, the hunt-model rules and the sidebar's Pet icons. Ticket 06 built `help` / `unhelp` and Pet Needs help. Pets in the arena are ticket 07. Decided in the 2026-11-05 Pet discussion and checked against real Claude Code sessions in tickets 01 and 05; vocabulary follows `GLOSSARY.md` (Pet, Hunter, Party, Hunting, Needs help).
+**Status:** built. Ticket 05 built `pets.mjs` `start`, `stop` and `tasks`, the folder watcher, the hunt-model rules and the sidebar's Pet icons. Ticket 06 built `help` / `unhelp` and Pet Needs help. Ticket 07 built Pets in the arena. Decided in the 2026-11-05 Pet discussion and checked against real Claude Code sessions in tickets 01 and 05; vocabulary follows `GLOSSARY.md` (Pet, Hunter, Party, Hunting, Needs help).
 
 A **Pet** is a Claude Code subagent (Agent tool, formerly Task) running inside a Hunter's agent. Herdr cannot see these: they run inside the Hunter's terminal and have no terminal of their own. So Claude Code has to write them down for the mod. It does that through hooks and a `subagentStatusLine` command that call one small script. Without that setup no Pet is ever shown, and nothing is guessed.
 
@@ -17,11 +17,12 @@ This extends the optional statusLine setup from ticket 06 (`statusline.mjs`, Ran
 7. [Verified behaviour (ticket 01)](#verified-behaviour-ticket-01)
 8. [Built in ticket 05](#built-in-ticket-05)
 9. [Built in ticket 06](#built-in-ticket-06)
+10. [Built in ticket 07](#built-in-ticket-07)
 
 ## What the user sees
 
 - Under each Hunter row: one line of Pet icons (the animal's face, 18 px), at most 2, then `[+N]`. Needs help first, then Hunting, then oldest. Hovering an icon shows the subagent type and the description the Hunter gave it. See layout F in `docs/records/2026-11-05-hunter-row.html`.
-- In the arena: up to 2 animal sprites at 2× by each shown Hunter's feet, plus `[+N]`.
+- In the arena: up to 2 animal sprites at 2× at each drawn Hunter's feet, plus `[+N]`. Hunting Pets swap their two frames; a Pet that Needs help stands under a blinking `!`, like a Hunter that Needs help.
 - A Pet that Needs help gets a 2 px peach frame on its icon, expands its Area and turns the Area dot peach, the same as a Hunter. Pane headers and tabs don't change: the prompt already shows in the Hunter's terminal.
 - A Pet that is Hunting keeps the Monster alive (no Slain) and keeps HP wearing down.
 - When a Pet finishes it disappears. There is no Cleared Pet.
@@ -286,3 +287,16 @@ Claude Code 2.1.318 in a temporary space (terminal `t2m`), manual permission mod
 - A subagent's Bash prompt set `help` 2.4 s after its start; the icon showed the peach frame (the Hunter's own row was Needs help too, since Herdr sees the prompt in its terminal).
 - Approving it set `hunting` (PostToolUse); the next prompt set `help` again 2.4 s later.
 - Denying the next prompt with Esc: `hunting` came 8.3 s after `helpAt` (a tick, as no PostToolUse fires), and `SubagentStop` removed the record 0.8 s later.
+
+## Built in ticket 07
+
+- `arena.js`: `pets()` and `pet()` draw each drawn Hunter's `pets.shown` (no new hunt-model field). Each Pet is its animal's `art/x4/animals/<Animal>/SpriteSheet.png` (16 × 16 frames drawn at 2×, 32 px) with its top-left at (−16, +20) and (+16, +20) from the Hunter's slot. Each Hunter is followed by its Pets in slot order, so a lower slot stands in front of the Pets above it. The `[+N]` chip (10 px, canvas at 80%) is drawn last, at (−38, +36) from the slot on the left-hand slots (1 and 3) and (+46, +36) on the right-hand ones (2 and 4). Below the pair it would sit on the next Hunter's head, or on the caption under slot 4, and right of the pair on slot 1 it would cover slot 2's Hunter.
+- Animation: a Hunting Pet's two frames sit under `before(0.5, 640)` / `after(0.5, 640)` opacity loops (320 ms each, like the Hunter's Idle/Attack swap); a Needs help Pet shows frame 0 under a 16 px `blocked` `!` with `.frames(["!", " "], 400)`, 14 px above its box. Element ids carry `<terminal>-<agent>`. No timer is added.
+- The arena's `active` flag (the Resting `z` float and the Monster's idle strip while someone Needs help) now counts Pets that are Hunting or Need help too. The pick of the four Hunters (`arenaPick`) is still Hunters only.
+- `tools/build-art.py` also writes the 10 animals' x4 sprite sheets (the rest of its output is pixel-identical; the five rebuilt Hunter strips came out with different PNG bytes, so the old files were kept).
+
+### Verified behaviour (ticket 07)
+
+- Demo snapshot (`demo: true`): login's Dog and Cat with `[+3]` right of them (slot 2), cart's Frog under a blinking `!` (slot 1), docs' Dog2 (slot 3), clear of the Monster, HP bar and caption. Back-to-back shots (about 50 ms apart): each Hunting Pet's pixels flip between two hashes about every 320 ms, the `!` every 400 ms.
+- Live, Claude Code 2.1.318 in a temporary space, manual mode, with the README block in a throwaway project's `.claude/settings.local.json`: four subagents running `ping -n 60` gave the Knight in slot 1 a Chicken and a Dog with `[+2]` left of them, swapping frames. A bare `sleep 50` is refused by Claude Code's Bash tool, so those subagents ended at once. A subagent's `mkdir` prompt was answered within seconds, before a shot (not by the test), so the Needs help `!` was shot with a hand-written `help` record (Monkey) beside two live Hunting Pets: it took the first spot, under a blinking `!`, with `[+1]`.
+- Calm: with the Hunter Resting and no Pets, 70 arena shots over 2.4 s had one hash.

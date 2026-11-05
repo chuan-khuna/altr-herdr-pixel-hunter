@@ -77,5 +77,6 @@ Made from those by `tools/build-art.py` (derived, still CC0):
 - `arena/<map>.png`: the six 160x96 arena backgrounds composed from the tilesets,
   then desaturated and darkened toward the canvas `#101a24`.
 - `x4/...`: nearest-neighbour 4x copies of the arenas (`x4/arena/<map>-v<N>.png`),
-  the sprite strips above and the Monster facesets, so they stay crisp when drawn
+  the sprite strips above, the Monster facesets and the animals' sprite sheets
+  (`x4/animals/<Animal>/SpriteSheet.png`), so they stay crisp when drawn
   at 2x (GPUI scales images smoothly).

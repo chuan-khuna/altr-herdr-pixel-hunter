@@ -1,9 +1,11 @@
 // The arena: a top-down scene of the current Area's map at the top of the sidebar.
 // The background is 160x96 art px shown at 2x; the Monster stands on the right playing
-// its Idle strip, aligned by its feet; up to four Hunters stand on the left facing it.
+// its Idle strip, aligned by its feet; up to four Hunters stand on the left facing it, each
+// with up to two of its Pets at its feet.
 //
 // Everything moves natively (opacity/top/left loops, `top`/`opacity`/`width` transitions,
-// text frames) and only while the Party has someone Hunting or Needing help; the one
+// text frames) and only while the Party (Hunters and their Pets) has someone Hunting or
+// Needing help; the one
 // exception is the Monster's fall when it's Slain, a single one-shot transition. With everyone Resting or Cleared,
 // the scene is drawn still and schedules nothing; a Cleared hop is two one-shot timers.
 //
@@ -51,6 +53,16 @@ const LUNGE = 6;
 const SWAP_MS = 1040; // Idle and Attack, 520 ms each
 const HOP = 12;
 const HOP_MS = 180;
+
+// Pets (the Hunter's pets.shown, at most 2): 16 px animals at 2x in a row at their Hunter's
+// feet, top-left of each from the Hunter's slot, drawn in front of it. Each sprite sheet is two
+// frames (stand, leap); a Hunting Pet swaps them, one that Needs help stands under a blinking
+// "!". The [+N] for the rest goes left of the pair on the left column and right of it on the
+// right one, which keeps it off the next Hunter, the caption and the Monster.
+const PET = 16; // art px
+const PET_AT = [[-16, 20], [16, 20]];
+const PET_MORE_AT = [[-38, 36], [46, 36], [-38, 36], [46, 36]]; // per slot
+const PET_SWAP_MS = 640; // the two frames, 320 ms each
 
 // A square wave from a linear loop: opacity far outside 0..1 is clamped, so the element
 // is fully shown while the loop's there-and-back phase t (0..1..0) is past `at`, and
@@ -174,6 +186,37 @@ function hunter(self, h, [x, y], active, c) {
   return box.child(idle).child(z);
 }
 
+// A Hunter's Pet at its spot, facing right: Hunting swaps the sheet's two frames natively,
+// Needs help holds the first under a blinking "!" (as the Hunter's own "!").
+function pet(h, p, [x, y], c) {
+  const art = `${X4}/animals/${p.animal}/SpriteSheet.png`;
+  const id = `${h.terminal}-${p.agent}`;
+  const box = div().id(`ph-arena-p-${id}`).absolute().left(x).top(y).w(PET * S).h(PET * S);
+  if (p.state === "help") {
+    return box
+      .child(frame(art, PET, PET, 2, 0))
+      .child(div().absolute().left(0).w(PET * S).top(-14).flex().justify_center()
+        .text_size(16).font_semibold().text_color(c.blocked)
+        .frames(["!", " "], 400));
+  }
+  return box
+    .child(div().id(`ph-arena-p0-${id}`).absolute().left(0).top(0)
+      .loop("opacity", before(0.5, PET_SWAP_MS)).child(frame(art, PET, PET, 2, 0)))
+    .child(div().id(`ph-arena-p1-${id}`).absolute().left(0).top(0)
+      .loop("opacity", after(0.5, PET_SWAP_MS)).child(frame(art, PET, PET, 2, 1)));
+}
+
+// A drawn Hunter's Pets (pets.shown) at its feet, and its [+N] badge or null.
+function pets(h, [x, y], slot, c) {
+  const sprites = h.pets.shown.map((p, k) => pet(h, p, [x + PET_AT[k][0], y + PET_AT[k][1]], c));
+  const [mx, my] = PET_MORE_AT[slot];
+  const badge = h.pets.more > 0
+    ? div().id(`ph-arena-pm-${h.terminal}`).absolute().left(x + mx).top(y + my).px(2)
+      .text_size(10).text_color(c.foreground).bg(`${c.canvas}cc`).child(`[+${h.pets.more}]`)
+    : null;
+  return { sprites, badge };
+}
+
 // Cleared Hunters hop once when they turn Cleared (not ones already Cleared at start):
 // up, then down, then back to Idle, on two one-shot timers.
 function hops(self, model, cx) {
@@ -202,15 +245,20 @@ export function arena(self, model, c, cx) {
   if (cx) hops(self, model, cx);
   const area = model.areas.find((a) => a.current) ?? model.areas[0];
   if (!area) return null;
-  const active = area.hunters.some((h) => h.state === "hunting" || h.state === "help");
+  const awake = (s) => s === "hunting" || s === "help";
+  const active = area.hunters.some((h) => awake(h.state) || h.pets.all.some((p) => awake(p.state)));
   const { hunters, more } = area.arena;
+  // Slots go top to bottom, so each Hunter and its Pets stand in front of the slots above;
+  // the [+N] badges go on top of everything.
+  const party = hunters.map((h, i) => ({ h, i, ...pets(h, SLOTS[i], i, c) }));
   const beast = monster(area, active);
   return div().id("ph-arena").flex().flex_none().w_full().h(ARENA_H + FRAME).justify_center().overflow_hidden()
     .bg(c.canvas).border_b(FRAME).border_color(c.border)
     .child(div().id(`ph-arena-${area.map.id}`).relative().flex_none().w(ARENA_W).h(ARENA_H)
       .child(image(`${X4}/arena/${area.map.id}-v${ARENA_VERSION}.png`).absolute().left(0).top(0).w(ARENA_W).h(ARENA_H))
       .when(beast != null, (el) => el.child(beast))
-      .children(hunters.map((h, i) => hunter(self, h, SLOTS[i], active, c)))
+      .children(party.flatMap(({ h, i, sprites }) => [hunter(self, h, SLOTS[i], active, c), ...sprites]))
+      .children(party.map((m) => m.badge).filter(Boolean))
       .child(label(plain(`${area.map.name} · ${area.monster.name}`), c).left(10).bottom(6))
       .child(hp(area, c))
       .when(more > 0, (el) => el.child(label(`+${more}`, c).left(10).top(8))));
