@@ -1,7 +1,7 @@
 // The hunt model, snapshot in and view model out. Run: node --test mods/pixel-hunter/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS } from "../hunt.js";
+import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS, paneFrame } from "../hunt.js";
 import { readFileSync } from "node:fs";
 
 const HOME = "/Users/me";
@@ -397,4 +397,76 @@ test("a record older than the freshness limit is marked stale, with when it turn
   const custom = hunters(sessions, { now: 1000 + 11_000, ranks: { staleAfterSeconds: 10 } })[0].stamina;
   assert.equal(custom.stale, true, "the limit comes from the table");
   assert.equal(rankTable({ staleAfterSeconds: -1 }).staleAfterSeconds, RANKS.staleAfterSeconds);
+});
+
+// Tabs and pane headers (ticket 07)
+
+test("each tab shows its first Hunter in pane order, its worst state, and none without an agent", () => {
+  const s = space({ tabs: [{ id: "tb-b", index: 2 }, { id: "tb-a", index: 1 }, { id: "tb-c", index: 3 }] });
+  const panes = [
+    shell(s, { tab: "tb-a", pane: "p-sh" }),
+    agent(s, "t2", { tab: "tb-a", status: "working" }),
+    agent(s, "t3", { tab: "tb-a", status: "blocked" }),
+    agent(s, "t4", { tab: "tb-b", status: "done" }),
+    shell(s, { tab: "tb-c", pane: "p-sh2", terminal: "sh2" }),
+  ];
+  const { areas } = hunt({ spaces: [s], panes, home: HOME });
+  const tabs = areas[0].tabs;
+  assert.deepEqual(tabs.map((t) => t.id), ["tb-a", "tb-b", "tb-c"]);
+  assert.deepEqual(tabs.map((t) => t.index), [1, 2, 3]);
+  // the lead is the first Hunter, not the shell before it and not the most urgent one
+  assert.equal(tabs[0].lead.terminal, "t2");
+  assert.equal(tabs[0].lead.cls.name, "Knight");
+  assert.equal(tabs[0].worst, "help");
+  assert.equal(tabs[0].hunters, 2);
+  assert.equal(tabs[1].lead.terminal, "t4");
+  assert.equal(tabs[1].worst, "cleared");
+  assert.deepEqual([tabs[2].lead, tabs[2].worst, tabs[2].hunters], [null, null, 0]);
+});
+
+test("peach wins over focus: a pane Needing help is framed help even with the keyboard", () => {
+  assert.equal(paneFrame("help", true), "help");
+  assert.equal(paneFrame("help", false), "help");
+  assert.equal(paneFrame("hunting", true), "focus");
+  assert.equal(paneFrame("resting", false), null);
+  assert.equal(paneFrame(undefined, true), "focus");
+
+  const s = space();
+  const panes = [
+    agent(s, "t1", { status: "blocked", focused: true }),
+    agent(s, "t2", { status: "working" }),
+    shell(s, { focused: false }),
+  ];
+  const out = hunt({ spaces: [s], panes, home: HOME });
+  assert.deepEqual(out.panes.map((p) => [p.terminal, p.frame]), [["t1", "help"], ["t2", null], ["sh-" + s.id, null]]);
+  const moved = hunt({ spaces: [s], panes: panes.map((p) => ({ ...p, focused: p.terminal === "t2", status: p.terminal === "t1" ? "idle" : p.status })), home: HOME });
+  assert.deepEqual(moved.panes.map((p) => p.frame), [null, "focus", null]);
+});
+
+test("pane headers get the Hunter, its own folder and branch; shells and mod panes get none", () => {
+  const s = space({ tabs: [{ id: "x1", index: 1 }, { id: "x2", index: 2 }] });
+  const other = space();
+  const panes = [
+    agent(s, "t1", { tab: "x2", cwd: `${HOME}/code/shop-api-cart`, branch: "fix/cart", status: "working" }),
+    agent(s, "t2", { tab: "x1", cwd: `${HOME}/code/shop-api`, branch: "feat/login" }),
+    shell(s, { tab: "x1", cwd: "/tmp", branch: null }),
+    { pane: "p-mod", terminal: null, tab: "x1", status: null, title: "notes" },
+    agent(other, "t9", { status: "blocked" }),
+    agent(s, "t-gone", { tab: "elsewhere" }),
+  ];
+  const out = hunt({ spaces: [s, other], panes, home: HOME });
+  const by = Object.fromEntries(out.panes.map((p) => [p.pane, p]));
+  assert.deepEqual(Object.keys(by).sort(), ["p-mod", "p-sh-" + s.id, "p-t1", "p-t2", "p-t9"].sort());
+  assert.equal(by["p-t1"].hunter.cls.name, "Mage"); // tab order: t2 (tab 1) came first
+  assert.equal(by["p-t1"].hunter.state, "hunting");
+  assert.equal(by["p-t1"].path, "~/code/shop-api-cart");
+  assert.equal(by["p-t1"].branch, "fix/cart"); // its own branch, even where the Area's differs
+  assert.equal(by["p-t1"].hunter.rank.label, "Claude Code");
+  assert.equal(by["p-t2"].hunter.cls.name, "Knight");
+  assert.equal(by["p-t9"].space, other.id);
+  assert.equal(by["p-t9"].frame, "help");
+  const sh = by["p-sh-" + s.id];
+  assert.deepEqual([sh.hunter, sh.program, sh.path, sh.branch], [null, "zsh", "/tmp", null]);
+  const mod = by["p-mod"];
+  assert.deepEqual([mod.hunter, mod.terminal, mod.path, mod.branch, mod.frame], [null, null, null, null, null]);
 });

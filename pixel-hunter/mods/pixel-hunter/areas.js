@@ -20,6 +20,14 @@ function face(path, size, x, y, c) {
     .child(image(path).absolute().left(x).top(y).w(38).h(38));
 }
 
+// A Hunter's face for the tab bar and pane headers: the 38 px faceset at 1:1, cropped to its
+// middle 24 px (as in the preview record: 7 px in, 5 px down), no frame.
+export const SMALL_FACE = 24;
+export function smallFace(cls) {
+  return div().relative().w(SMALL_FACE).h(SMALL_FACE).flex_none().overflow_hidden()
+    .child(image(hunterFace(cls)).absolute().left(-7).top(-5).w(38).h(38));
+}
+
 // The Monster's face in an Area row: the 38 px faceset at 2x (76 px, twice a Hunter
 // face), spanning both lines. The frame covers its outer art pixel all round.
 export const MONSTER_FACE = 76;

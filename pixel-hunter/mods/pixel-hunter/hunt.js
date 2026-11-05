@@ -25,7 +25,7 @@
 //
 // Output:
 //   areas   [{ id, index, name, named, current, map, monster, worst, path, branch, key, hunters, arena,
-//              hp, mode, wearing }]
+//              tabs, hp, mode, wearing }]
 //           map     { id: "forest", name: "Forest", monsters: [...] }
 //           monster { id: "GiantRacoon", name: "Giant Racoon" }  (the pack's sprite folder)
 //           worst   the worst hunt state in the Party, or null with no Hunters
@@ -40,6 +40,9 @@
 //                   still saying done); it stays Slain until someone Hunts again (Respawn
 //                   with full HP); else "idle"
 //           wearing true while HP is wearing down (mode "hit"); see hpAfter()
+//           tabs    [{ id, index, lead, worst, hunters }] in tab order, for the tab bar: lead is the
+//                   tab's first Hunter in pane order (its face), or null with no agent (a map
+//                   icon); worst its most urgent hunt state (the dot), or null; hunters how many
 //   hunters [{ terminal, pane, tab, cls, state, status, program, rank, stamina, branch, focused }]
 //           cls     { name: "Knight", sprite: "Knight" }
 //           rank    { grade: "A", label: "Opus 5.5", text: "[A] Opus 5.5" }: grade "?" for a
@@ -50,6 +53,11 @@
 //                   staleAfterSeconds (shown as "old"); staleAt: when a fresh one turns stale
 //           state   "hunting" | "help" | "cleared" | "resting"
 //           branch  its own branch only when it differs from its Area's, else null
+//   panes   [{ pane, terminal, tab, space, hunter, program, path, branch, focused, frame }], every
+//           pane of every space, for the pane headers: hunter is its Hunter (as in areas) or
+//           null (a shell, a mod pane); path its own folder for display (PANE_PATH_MAX), null
+//           without one; branch its own git branch, null outside git; frame "help" (peach)
+//           when its Hunter Needs help, else "focus" (mint) when it has the keyboard, else null
 //   state   the next persisted state: { ...state, classes: { [terminal]: "Knight" },
 //           monsters: { [spaceId]: { hp, since, slain } } }
 //           A Monster record changes only when its Party starts or stops Hunting, is Slain or
@@ -148,6 +156,25 @@ export function arenaPick(hunters, max = ARENA_MAX) {
   const sorted = hunters.map((h, i) => ({ h, i })).sort((a, b) => rank(a.h) - rank(b.h) || a.i - b.i).map(({ h }) => h);
   return { hunters: sorted.slice(0, max), more: Math.max(0, sorted.length - max) };
 }
+
+/** A pane's frame: "help" when its Hunter Needs help, else "focus" when focused, else null.
+ *  Peach (help) wins over focus, so urgency never hides behind the keyboard. */
+export function paneFrame(state, focused) {
+  return state === "help" ? "help" : focused ? "focus" : null;
+}
+
+/** The tab bar's view of a space's tabs, in tab order: each tab's first Hunter, worst state and count. */
+export function tabsOf(tabs, hunters) {
+  return (tabs ?? [])
+    .map((t, i) => ({ t, i, index: Number.isFinite(t.index) ? t.index : i + 1 }))
+    .sort((a, b) => a.index - b.index || a.i - b.i)
+    .map(({ t, index }) => {
+      const own = hunters.filter((h) => h.tab === t.id);
+      return { id: t.id, index, lead: own[0] ?? null, worst: worstState(own.map((h) => h.state)), hunters: own.length };
+    });
+}
+
+export const PANE_PATH_MAX = 48;
 
 // Monster HP (cosmetic). While the Party Hunts, HP halves its way toward HP_FLOOR every
 // HP_HALF_MS, so it keeps moving on a long hunt but only Slain takes it to 0.
@@ -297,6 +324,7 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
   const oldMonsters = state.monsters && typeof state.monsters === "object" ? state.monsters : {};
   // Records of closed spaces go, but not while Herdr lists no spaces at all (still starting).
   const monsters = spaces.length ? {} : { ...oldMonsters };
+  const paneViews = [];
 
   const areas = spaces.map((s, index) => {
     const ps = perSpace[index];
@@ -321,6 +349,22 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
         focused: !!p.focused,
       };
     });
+    const byTerminal = new Map(hunters.map((h) => [h.terminal, h]));
+    for (const p of ps) {
+      const hunter = (p.terminal && byTerminal.get(p.terminal)) || null;
+      paneViews.push({
+        pane: p.pane ?? null,
+        terminal: p.terminal ?? null,
+        tab: p.tab,
+        space: s.id,
+        hunter,
+        program: p.program || null,
+        path: p.cwd ? displayPath(p.cwd, home, PANE_PATH_MAX) : null,
+        branch: p.branch || null,
+        focused: !!p.focused,
+        frame: paneFrame(hunter?.state, !!p.focused),
+      });
+    }
     return {
       id: s.id,
       index,
@@ -335,11 +379,12 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       key: typeof keys[index + 1] === "string" ? keys[index + 1] : null,
       hunters,
       arena: arenaPick(hunters),
+      tabs: tabsOf(s.tabs, hunters),
       ...monsterView((monsters[s.id] = monsterStep(oldMonsters[s.id], agentsOf(ps).map((p) => ({
         state: huntState(p.status), done: p.status === "done" || p.report === "done",
       })), now)), now),
     };
   });
 
-  return { areas, state: { ...state, classes, monsters } };
+  return { areas, panes: paneViews, state: { ...state, classes, monsters } };
 }
