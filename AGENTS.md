@@ -23,6 +23,7 @@ Read its **Layouts**, **Mods** and **Share** sections before touching anything.
     mods/<each mod the layout uses that isn't shipped by Herdr>/
     RECIPE.md                     brief another agent builds it from, empty folder
     preview.png                   screenshot of the layout running
+    LICENSE                       MIT for the code (art is CC0, fonts OFL; not synced)
   ```
 
 - `scripts/sync.sh` copies the live layout, its `pixel-hunter*` themes and mods into

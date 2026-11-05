@@ -10,9 +10,15 @@ Monster, and agents become a Party of Hunters. Everything lives in
 ## Install
 
 Ask your Herdr agent to add this repo's `pixel-hunter/` folder, or copy
-`pixel-hunter/layouts/*` into `~/.config/herdr-app/layouts/` and
+`pixel-hunter/layouts/*` into `~/.config/herdr-app/layouts/`,
+`pixel-hunter/themes/*` into `~/.config/herdr-app/themes/` and
 `pixel-hunter/mods/*` into `~/.config/herdr-app/mods/`, then run
-`layout.switch pixel-hunter`. `ctrl-shift-l` switches back.
+`layout.switch pixel-hunter`. `ctrl-shift-l` switches back. The theme file is
+needed: the layout names `pixel-hunter-night`. If the pixel fonts don't show at
+once, restart Herdr (they load at start and on a look change).
+
+The mod runs no programs and reaches no network. Outside its own folder it
+only reads `~/.config/herdr-app/data/pixel-hunter/sessions/` (see below).
 
 ## Rank and Stamina (optional, Claude Code)
 
@@ -96,3 +102,12 @@ tab's Hunters a fixed Class, name the tab and pin it in
   restart.
 
 The shipped file pins nothing: `{ "tabs": {} }`.
+
+## License
+
+The code is MIT (see [LICENSE](LICENSE)). The sprites and tiles are from the
+[Ninja Adventure Asset Pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack)
+by pixel-boy and AAA, CC0 1.0 (see
+[`art/CREDITS.md`](pixel-hunter/mods/pixel-hunter/art/CREDITS.md)). The fonts,
+Pixelify Sans and Press Start 2P, are under the SIL Open Font License 1.1 (see
+[`fonts/`](pixel-hunter/mods/pixel-hunter/fonts/)).
