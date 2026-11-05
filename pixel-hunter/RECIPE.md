@@ -129,9 +129,13 @@ Giant Frog.
 
 **The Monster** (per Area, cosmetic):
 
-- While anyone in the Party is Hunting, it plays its Hit strip (90 ms a frame, there and
-  back; the Giant Racoon has no Hit strip and plays its Attack) and shakes 2 px either way
-  every 300 ms. Its HP wears down: it halves its way toward 5 every 4 minutes (100, 52
+- While anyone in the Party is Hunting, it plays its Idle strip (160 ms a frame, there and
+  back) and, once every 5 s, its Hit strip once through, there and back, at 90 ms a frame
+  (`2 × frames × 90 ms`: 540 ms for 3 frames, 720 ms for 4, 1440 ms for the Tengu's 8; the
+  Giant Racoon has no Hit strip and plays its 4-frame Attack). It shakes 2 px either way
+  every 300 ms only during that play, then goes back to Idle. Each strip stands on its own
+  `feet` row, so the feet stay on (236, 128) through the swap. The first play comes about
+  2.5 s after the Party starts Hunting (or the arena shows this Area). Its HP wears down: it halves its way toward 5 every 4 minutes (100, 52
   after 4 min, 29 after 8), so only Slain reaches 0. The sidebar redraws once every 10 s
   for this, and only while some HP is wearing.
 - With nobody Hunting and somebody's agent done (Herdr's `done`, or herdr-core still
@@ -352,7 +356,11 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   handful of panes.
 - **Monster frames** play as stacked images inside nested linear opacity loops (GPUI
   clamps opacity, so a loop from -1000 to 1000 works as a square wave); there is no
-  frame-strip element.
+  frame-strip element. The 5 s attack is one more 5000 ms loop, not a timer: the Hit
+  strip shows while that loop's phase is past `1 - play / 5000` (around its turn) and its
+  frames are bands of that last stretch, so the phase rising then falling plays them there
+  and back; the Idle strip shows the rest of the time. Loops built in one render share
+  their phase, which keeps the Hit frames in step with the show/hide.
 - Limits: four Hunters in the arena, six Classes and six maps before they repeat, 256
   session records, paths 30 characters in Area rows and 48 in pane headers, tab names
   170 px.
@@ -371,7 +379,8 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
 - Each space is an Area with the next map (Forest, Desert, Dungeon, ...) and its Monster's
   76 px face; the arena shows the current Area's map and Monster.
 - A fake agent (a terminal printing `ESC ] 7501 ; state=working BEL`) appears as a Hunter
-  with the next Class and `⚔ HUNTING`; the Monster plays its Hit strip and shakes, and both
+  with the next Class and `⚔ HUNTING`; the Monster idles and plays its Hit strip, shaking,
+  once every 5 s, and both
   HP bars wear down together.
 - `state=blocked`: the row and the pane header turn peach, the arena Hunter raises a hand
   under a blinking `!`, and its Area opens and can't be closed.

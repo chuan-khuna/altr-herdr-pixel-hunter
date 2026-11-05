@@ -21,7 +21,8 @@ export const ARENA_H = 96 * S;
 
 // Monster strips: frames `w` x `size` art px (`w` defaults to `size`; the samurai's are
 // 96 x 48, swords out to the sides), `feet` = just below the lowest opaque
-// row. `hit` plays while the Party Hunts (Racoon has no Hit strip: its Attack plays).
+// row. `hit` plays once every ATTACK_MS while the Party Hunts (Racoon has no Hit strip:
+// its Attack plays).
 const MONSTER_ART = {
   GiantRacoon: { file: "Idle.png", size: 60, frames: 6, feet: 55, hit: { file: "Attack.png", frames: 4, feet: 60 } },
   DemonCyclop: { file: "Idle.png", size: 50, frames: 5, feet: 43, hit: { file: "Hit.png", frames: 3, feet: 43 } },
@@ -33,7 +34,8 @@ const MONSTER_ART = {
 const MONSTER_FEET = { x: 236, y: 128 }; // logical px in the arena
 const MONSTER_FRAME_MS = 160;
 const HIT_FRAME_MS = 90;
-const SHAKE = 2; // px either way, there and back every SHAKE_MS
+const ATTACK_MS = 5000; // one Hit play (2 x frames x HIT_FRAME_MS) per ATTACK_MS while Hunting
+const SHAKE = 2; // px either way, there and back every SHAKE_MS, during the Hit play only
 const SHAKE_MS = 300;
 // Slain: the Monster drops FALL px and fades to SLAIN_OPACITY in one native transition.
 const FALL = 14;
@@ -65,19 +67,41 @@ function frame(path, fw, fh, n, col) {
 
 const hunterArt = (h, file) => `${X4}/chars/${h.cls.sprite}/${file}.png`;
 
-// A strip's frames taking turns (there and back) through nested band loops, one at a time.
-function strip(path, w, size, n, frameMs, tag) {
-  const period = 2 * n * frameMs;
+// A strip's frames taking turns (there and back) through nested band loops, one at a time:
+// frame k shows while the loop's phase is in the k-th of n equal bands of `lo`..1 (below
+// `lo` frame 0 shows; the caller hides the strip there when `lo` > 0).
+function strip(path, w, size, n, period, tag, lo = 0) {
+  const band = (k) => lo + (k * (1 - lo)) / n;
   return Array.from({ length: n }, (_, k) => {
     let el = frame(path, w, size, n, k);
-    if (k < n - 1) el = div().id(`ph-arena-${tag}-${k}-b`).loop("opacity", before((k + 1) / n, period)).child(el);
-    if (k > 0) el = div().id(`ph-arena-${tag}-${k}-a`).loop("opacity", after(k / n, period)).child(el);
+    if (k < n - 1) el = div().id(`ph-arena-${tag}-${k}-b`).loop("opacity", before(band(k + 1), period)).child(el);
+    if (k > 0) el = div().id(`ph-arena-${tag}-${k}-a`).loop("opacity", after(band(k), period)).child(el);
     return div().absolute().left(0).top(0).child(el);
   });
 }
 
+// Hunting: the Idle strip, and once every ATTACK_MS the Hit strip played once through, there
+// and back, shaking. One ATTACK_MS loop drives both: its phase t runs 0..1..0; the Hit strip
+// shows while t is past `at` (a play centred on the turn at t = 1) and its frames are the
+// bands of at..1, so t rising then falling plays them 0..n-1..0 at HIT_FRAME_MS each. The
+// Idle strip shows the rest of the time. Each strip stands on its own `feet`.
+function attacks(m, dir, w, id) {
+  const play = 2 * m.hit.frames * HIT_FRAME_MS;
+  const at = 1 - play / ATTACK_MS;
+  const idle = strip(`${dir}/${m.file}`, w, m.size, m.frames, 2 * m.frames * MONSTER_FRAME_MS, "mi");
+  const hit = strip(`${dir}/${m.hit.file}`, w, m.size, m.hit.frames, ATTACK_MS, "mh", at);
+  return div().absolute().left(0).top(0).size_full()
+    .child(div().id(`ph-arena-mrest-${id}`).absolute().left(0).top(0).size_full()
+      .loop("opacity", before(at, ATTACK_MS)).children(idle))
+    .child(div().id(`ph-arena-mhit-${id}`).absolute().left(0).top((m.feet - m.hit.feet) * S).size_full()
+      .loop("opacity", after(at, ATTACK_MS))
+      .child(div().id(`ph-arena-mshake-${id}`).absolute().left(0).top(0).size_full()
+        .loop("left", { from: -SHAKE, to: SHAKE, period: SHAKE_MS, easing: "linear" })
+        .children(hit)));
+}
+
 // The Monster by `area.mode`:
-// - hit (someone Hunting): its Hit strip, shaking SHAKE px either way;
+// - hit (someone Hunting): its Idle strip, with one shaking Hit play every ATTACK_MS;
 // - idle: its Idle strip while the arena is awake (someone Needs help), a still first frame when calm;
 // - slain: the still first frame, dropped FALL px and faded. The drop and fade are a one-shot
 //   native transition on `ph-arena-mbody-*`, which keeps its id across modes, so it plays
@@ -89,18 +113,16 @@ function monster(area, active) {
   const dir = `${X4}/boss/${area.monster.id}`;
   const hit = area.mode === "hit" && m.hit;
   const slain = area.mode === "slain";
-  const feet = hit ? m.hit.feet : m.feet;
   const w = m.w ?? m.size;
   const box = div().id(`ph-arena-monster-${area.monster.id}`).absolute()
-    .left(MONSTER_FEET.x - (w * S) / 2).top(MONSTER_FEET.y - feet * S)
+    .left(MONSTER_FEET.x - (w * S) / 2).top(MONSTER_FEET.y - m.feet * S)
     .w(w * S).h(m.size * S);
   let body;
   if (hit) {
-    body = div().id(`ph-arena-mshake-${area.monster.id}`).absolute().left(0).top(0).size_full()
-      .loop("left", { from: -SHAKE, to: SHAKE, period: SHAKE_MS, easing: "linear" })
-      .children(strip(`${dir}/${m.hit.file}`, w, m.size, m.hit.frames, HIT_FRAME_MS, "mh"));
+    body = attacks(m, dir, w, area.monster.id);
   } else if (active && !slain) {
-    body = div().absolute().left(0).top(0).size_full().children(strip(`${dir}/${m.file}`, w, m.size, m.frames, MONSTER_FRAME_MS, "mi"));
+    body = div().absolute().left(0).top(0).size_full()
+      .children(strip(`${dir}/${m.file}`, w, m.size, m.frames, 2 * m.frames * MONSTER_FRAME_MS, "mi"));
   } else {
     body = frame(`${dir}/${m.file}`, w, m.size, m.frames, 0);
   }
