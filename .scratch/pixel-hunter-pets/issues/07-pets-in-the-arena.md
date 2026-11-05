@@ -10,6 +10,8 @@
 
 **Blocked by:** 05
 
+**From ticket 05:** the sprite sheets are in `art/animals/<Animal>/SpriteSheet.png` (32×16, two 16×16 frames), with no `art/x4/` copies yet (`tools/build-art.py` makes those).
+
 **Status:** ready-for-agent
 
 - [ ] Pet sprites sit beside their Hunter without covering the Monster, the HP bar or the caption

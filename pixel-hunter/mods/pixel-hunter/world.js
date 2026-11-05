@@ -2,7 +2,7 @@
 // and keeps the persisted part in shared state (on disk, the same for every copy).
 import { spaces, panes, terminals, keys, home, shared, setShared, props } from "herdr";
 import { hunt, keyLabel, toggleArea } from "./hunt.js";
-import { DEMO, demoSessions } from "./demo.js";
+import { DEMO, demoSessions, demoPets } from "./demo.js";
 
 export const STATE_KEY = "pixel-hunter.state";
 
@@ -18,8 +18,8 @@ function spaceKeys() {
   return out;
 }
 
-// `self`: the role's View, holding the session records and grade table (sessions.js) and the
-// Class pins (pins.js).
+// `self`: the role's View, holding the session records and grade table (sessions.js), the
+// Pet records (petwatch.js) and the Class pins (pins.js).
 // The chevron: remember the opposite of what `area` (from world()) shows now, for its space.
 // Not in demo mode (the snapshot is never persisted).
 export function toggleExpanded(area) {
@@ -30,7 +30,7 @@ export function toggleExpanded(area) {
 }
 
 export function world(self, now = Date.now()) {
-  if (props()?.demo) return hunt({ ...DEMO, sessions: demoSessions(now), ranks: self?.ranks ?? null, pins: self?.pins ?? null, now }); // a screenshot snapshot, never persisted
+  if (props()?.demo) return hunt({ ...DEMO, sessions: demoSessions(now), pets: demoPets(now), ranks: self?.ranks ?? null, pins: self?.pins ?? null, now }); // a screenshot snapshot, never persisted
   const state = shared(STATE_KEY) ?? {};
   // herdr-core's own status per terminal: it keeps "done" after Herdr shows the agent as seen
   const report = new Map((terminals() ?? []).filter(Boolean).map((t) => [t.address, t.status]));
@@ -48,12 +48,14 @@ export function world(self, now = Date.now()) {
     keys: spaceKeys(),
     state,
     sessions: self?.sessions ?? {},
+    pets: self?.pets ?? {},
     ranks: self?.ranks ?? null,
     pins: self?.pins ?? null,
     now,
   });
-  // Until classes.json is read (pins.js), a pinned Hunter would get a Class by order: show it
-  // with what it had, but don't write that down, or the copies would fight over it.
-  if (self?.pins !== undefined && JSON.stringify(out.state) !== JSON.stringify(state)) setShared(STATE_KEY, out.state);
+  // Until classes.json is read (pins.js), a pinned Hunter would get a Class by order, and until
+  // the Pets are read (petwatch.js) a Hunting Pet's Monster could look Slain: show it, but don't
+  // write that down, or the copies would fight over it.
+  if (self?.pins !== undefined && self?.pets !== undefined && JSON.stringify(out.state) !== JSON.stringify(state)) setShared(STATE_KEY, out.state);
   return out;
 }

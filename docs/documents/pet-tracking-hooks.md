@@ -1,6 +1,6 @@
 # Pet tracking: Claude Code hooks
 
-**Status:** design, not built yet. Decided in the 2026-11-05 Pet discussion and checked against a real Claude Code session in ticket 01; vocabulary follows `GLOSSARY.md` (Pet, Hunter, Party, Hunting, Needs help).
+**Status:** partly built. Ticket 05 built `pets.mjs` `start`, `stop` and `tasks`, the folder watcher, the hunt-model rules and the sidebar's Pet icons. `help` / `unhelp` and Pet Needs help are ticket 06, Pets in the arena ticket 07. Decided in the 2026-11-05 Pet discussion and checked against real Claude Code sessions in tickets 01 and 05; vocabulary follows `GLOSSARY.md` (Pet, Hunter, Party, Hunting, Needs help).
 
 A **Pet** is a Claude Code subagent (Agent tool, formerly Task) running inside a Hunter's agent. Herdr cannot see these: they run inside the Hunter's terminal and have no terminal of their own. So Claude Code has to write them down for the mod. It does that through hooks and a `subagentStatusLine` command that call one small script. Without that setup no Pet is ever shown, and nothing is guessed.
 
@@ -15,10 +15,11 @@ This extends the optional statusLine setup from ticket 06 (`statusline.mjs`, Ran
 5. [Claude Code settings](#claude-code-settings)
 6. [Hunt model rules](#hunt-model-rules)
 7. [Verified behaviour (ticket 01)](#verified-behaviour-ticket-01)
+8. [Built in ticket 05](#built-in-ticket-05)
 
 ## What the user sees
 
-- Under each Hunter row: one line of Pet icons (the animal's face), at most 2, then `[+N]`. Needs help first, then Hunting, then oldest. Hovering an icon shows the subagent type and the description the Hunter gave it. See layout F in `docs/records/2026-11-05-hunter-row.html`.
+- Under each Hunter row: one line of Pet icons (the animal's face, 18 px), at most 2, then `[+N]`. Needs help first (ticket 06), then Hunting, then oldest. Hovering an icon shows the subagent type and the description the Hunter gave it. See layout F in `docs/records/2026-11-05-hunter-row.html`.
 - In the arena: up to 2 animal sprites at 2× by each shown Hunter's feet, plus `[+N]`.
 - A Pet that Needs help gets a peach frame on its icon, expands its Area and turns the Area dot peach, the same as a Hunter.
 - A Pet that is Hunting keeps the Monster alive (no Slain) and keeps HP wearing down.
@@ -31,11 +32,12 @@ This extends the optional statusLine setup from ticket 06 (`statusline.mjs`, Ran
 flowchart LR
   CC[Claude Code session<br>in Herdr terminal tN] -->|SubagentStart| S[pets.mjs start]
   CC -->|SubagentStop| X[pets.mjs stop]
-  CC -->|PermissionRequest| P[pets.mjs help]
-  CC -->|PostToolUse| U[pets.mjs unhelp]
+  CC -->|PermissionRequest| P[pets.mjs help, ticket 06]
+  CC -->|PostToolUse| U[pets.mjs unhelp, ticket 06]
   CC -->|subagentStatusLine tick| T[pets.mjs tasks]
   S & X & P & U & T --> F[(data/pixel-hunter/pets/tN/*.json)]
-  F -->|watchFolder| M[pixel-hunter mod: hunt.js]
+  F -->|watchFolder| W[petwatch.js]
+  W -->|"{ [terminal]: record[] }"| M[pixel-hunter mod: hunt.js]
 ```
 
 Every hook process inherits the terminal's environment, so `HC_TERMINAL_ID` (set by Herdr) tells the script which Hunter the Pet belongs to. Outside a Herdr terminal, or with an id that isn't a plain id, the script writes nothing.
@@ -47,18 +49,20 @@ The script is plain Node with no Herdr imports, at `mods/pixel-hunter/pets.mjs` 
 | Action | Called by | Input fields used | Effect |
 | --- | --- | --- | --- |
 | `start` | `SubagentStart` hook | `session_id`, `agent_id`, `agent_type` | Creates the Pet record. Picks an animal from the 10 small animals, skipping any already used by this terminal's live Pets until all 10 are taken. The first choice is seeded from `agent_id`, so a subagent that stops and is resumed (same `agent_id`, see below) usually comes back as the same animal. |
-| `stop` | `SubagentStop` hook | `agent_id` | Deletes the Pet record. A missing record is fine: SubagentStop also fires for Claude Code's internal agents. |
+| `stop` | `SubagentStop` hook | `agent_id` | Deletes the Pet record (the `<terminal>` folder stays). A missing record is fine: SubagentStop also fires for Claude Code's internal agents. |
 | `help` | `PermissionRequest` hook | `agent_id` (only when the prompt comes from a subagent) | Sets `state: "help"` and `helpAt` on that Pet. With no `agent_id`, the prompt is the Hunter's own and the action does nothing. |
 | `unhelp` | `PostToolUse` hook | `agent_id` | Sets `state: "hunting"` again: the Pet got past its prompt and ran a tool. A denied prompt fires no `PostToolUse`; the Pet then leaves at `SubagentStop`, or the next `tasks` tick clears it (below). |
-| `tasks` | `subagentStatusLine` command, every tick | `tasks[]`: `id`, `agentType`, `status`, `description`, `startTime` | For each `running` task, fills in `type` and `description` and refreshes `seenAt` (the heartbeat). A `completed` / `failed` / `killed` task deletes its record. A tick never arrives while a permission prompt is open, so a `help` Pet whose `helpAt` is more than 2 s before the tick goes back to `hunting`. |
+| `tasks` | `subagentStatusLine` command, every tick | `tasks[]`: `id`, `agentType`, `status`, `description` | For each task that has a record and isn't finished, fills in `type` and `description` and refreshes `seenAt` (the heartbeat). It never creates a record. A `completed` / `failed` / `killed` task deletes its record, unless the record's last start (`startAt`) is under 10 s old (see ticket 05 below). A tick never arrives while a permission prompt is open, so a `help` Pet whose `helpAt` is more than 2 s before the tick goes back to `hunting`. |
 
-The animals are Cat, Dog, Dog2, Cub, Frog, Racoon, Monkey, Chicken, Pig and Fish (Ninja Adventure `Actor/Animals/*/Faceset.png` at 38×38, and `SpriteSheet*.png` with two 16×16 frames). Cow, Horse and Lion are too big for a Pet. The art has to be fetched from the official pack zip, because the copy under `art/` has no animals yet. Add each file to `art/CREDITS.md`.
+The animals are Cat, Dog, Dog2, Cub, Frog, Racoon, Monkey, Chicken, Pig and Fish (Ninja Adventure `Actor/Animal/*/Faceset*.png` at 38×38, and `SpriteSheet*.png` with two 16×16 frames; Cub is the pack's `LionCub`, and Monkey, Chicken, Pig and Fish use the Brown, White, Pink and Red variants). Cow, Horse and Lion are too big for a Pet. They are copied from the official pack zip to `art/animals/<Animal>/Faceset.png` and `SpriteSheet.png`, listed in `art/CREDITS.md`.
 
 Rules shared with `statusline.mjs`:
 
 - Strip C0/C1 controls, DEL and bidi marks from `description` and `type`, and cap them at 80 chars.
 - Write via a temp file and rename, falling back to an in-place write on Windows.
 - `$PIXEL_HUNTER_PETS` overrides the folder and `$HERDR_APP_HOME` the Herdr home.
+- `HC_TERMINAL_ID` and `agent_id` must already be plain ids (`[A-Za-z0-9._-]`, not `.` or `..`); unlike `statusline.mjs`, nothing is stripped from them first.
+- Any action other than `start`, `stop` and `tasks` does nothing for now.
 - `tasks` rewrites a record only when its content changes or its `seenAt` is 30 s old, so a busy tick doesn't redraw the window every second.
 
 ## Records on disk
@@ -81,15 +85,16 @@ Each Pet gets its own file, so parallel subagents starting at once never race on
   "animal": "Dog",
   "state": "hunting",
   "startedAt": 1793900000000,
-  "seenAt": 1793900042000
+  "seenAt": 1793900042000,
+  "startAt": 1793900000000
 }
 ```
 
-`state` is `"hunting"` or `"help"`; `helpAt` (ms) is set with `"help"`. Before the first `tasks` tick, `type` comes from the hook's `agent_type` and `description` is empty.
+`state` is `"hunting"` or (ticket 06) `"help"`; `helpAt` (ms) is set with `"help"`. Before the first `tasks` tick, `type` comes from the hook's `agent_type` and `description` is empty. `startAt` is when the last `start` came; `startedAt` stays the first start while the record exists (a start after a stop is a new record).
 
 ## Claude Code settings
 
-These go in the user's `~/.claude/settings.json`. The setup guide shows them, but nothing edits the file for the user (same rule as ticket 06). Merge them with any hooks the user already has.
+These go in the user's `~/.claude/settings.json`. The setup guide shows them, but nothing edits the file for the user (same rule as ticket 06). Merge them with any hooks the user already has. The README's Pets section (ticket 05) shows only the `subagentStatusLine` and the `SubagentStart` / `SubagentStop` hooks, since `help` and `unhelp` do nothing until ticket 06, which adds the other two hooks to it.
 
 ```json
 {
@@ -116,6 +121,9 @@ These go in the user's `~/.claude/settings.json`. The setup guide shows them, bu
 - The tool used to be called `Task` (renamed `Agent` in Claude Code 2.1.63). The hooks above don't match on the tool name, so the rename doesn't matter.
 
 ## Hunt model rules
+
+Built in ticket 05 as below, except that every Pet is `hunting` until ticket 06 reads `state`, and the `help` exemption from the stale drop and the Needs help order and auto-expand are ticket 06.
+
 
 `hunt.js` gets a new input `pets` (`{ [terminal]: record[] }`, read by a `watchFolder` adapter like `sessions.js`) and a `petStaleAfterSeconds` setting (default 120, in the same config as `staleAfterSeconds`).
 
@@ -241,3 +249,23 @@ Before the first response the same object read `total_input_tokens: 0`, `context
 - Whether `subagentStatusLine` accepts a `refreshInterval` of its own.
 
 Sources: Claude Code docs, [hooks](https://code.claude.com/docs/en/hooks.md), [subagents](https://code.claude.com/docs/en/sub-agents.md), [status line](https://code.claude.com/docs/en/statusline.md).
+
+## Built in ticket 05
+
+Files in `mods/pixel-hunter/`:
+
+- `pets.mjs`: the hook script, actions `start`, `stop`, `tasks` (above). Tests: `test/pets.test.js`, black-box (spawned with env and stdin, like `test/statusline.test.js`).
+- `petwatch.js`: `startPets(self, cx)` keeps `self.pets` (`{ [terminal]: record[] }`, undefined until the first read). It watches `<appHome>/data/pixel-hunter/pets/` with `watchFolder` (creating it), and re-reads `<terminal>/<agent>.json` on each change: plain names only, at most 64 terminals and 256 records in all. It has no timer.
+- Every role that runs `world()` starts it (sidebar, tab bar, pane headers), because Pets change the Monster's persisted state: a role without them would write Slain while another writes Hunting. `world()` writes no persisted state until both the pins and the Pets are read. The demo sidebar uses `demoPets()` from `demo.js` instead.
+- `hunt.js`: `hunt({ …, pets })`, `petsOf()`, `ANIMALS`, `PETS_SHOWN = 2`. `rankTable()` reads `petStaleAfterSeconds` (default 120) from `rank.json`. Each Hunter gets `pets: { shown, more, all }`, each Pet `{ agent, type, description, animal, state: "hunting", startedAt, staleAt }`. A record is ignored without a string `agent`, a known `animal` or a numeric `seenAt`, or when its `app` differs from the pane's. It is dropped when `now >= seenAt + petStaleAfterSeconds × 1000`. Order: `PRIORITY` of the state, then `startedAt`, then `agent`. The Area's `worst` and the Monster's Party include Pets (Hunting, never done). Tab dots, `arenaPick` and Classes don't.
+- `sidebar.js`: `wakeAt()` also takes the earliest Pet `staleAt`, so the existing single one-shot timer redraws when the next Pet is due to leave.
+- `areas.js`: `petLine()` under the face-and-lines row inside `body` (see `hunter-row.md`).
+
+### Verified behaviour (ticket 05)
+
+Run on 2026-11-05 with Claude Code 2.1.318 in a temporary Herdr space (terminal `t2k`), with the README's block (plus the statusLine) in a throwaway project's `.claude/settings.local.json`. The `~` commands ran as given on Windows.
+
+- Four background subagents that each ran one long foreground command (`ping -n 45/60/75`, an Explore read): four records within 4 s, two icons and `[+2]`, `[+1]` once the Explore one finished, the count dropping as the pings ended, and no line after the last. Animals were all different. `seenAt` moved after 30 s.
+- **A subagent that waits isn't running.** Subagents told to `sleep 70` had the foreground sleep blocked and ran it as a background shell, then ended their turn. Claude Code fired `SubagentStop` and the ticks called their tasks `completed` while the agent panel still listed them and the shells ran. When a shell finished, the subagent got a new `SubagentStart` with the same `agent_id`, and the ticks said `completed` for up to one more tick before `running`. So, as for the nested parent in ticket 01, a waiting subagent has no Pet, and its Hunter's Monster can be Slain meanwhile. The `tasks` status can't tell waiting from done, so this can't be fixed in the script.
+- **The stale tick race.** Without a guard, that stale `completed` tick deleted the record the new `SubagentStart` had just written (seen live). `tasks` now leaves a record alone for 10 s (`START_GRACE_MS`, two ticks) after its last start. A real end still deletes it at `SubagentStop`, or after the grace on the next `completed` tick.
+- **Stale drop.** A hand-written record 110 s old showed its Pet, which was gone at 123 s without any other record change.

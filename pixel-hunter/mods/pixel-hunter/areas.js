@@ -14,6 +14,7 @@ export const monsterFace = (m) => `${ART}/boss/${m.id}/Faceset.png`;
 // The 4x copy (tools/build-art.py), for drawing a face at 2x without GPUI's smoothing.
 export const monsterFaceX4 = (m) => `${ART}/x4/boss/${m.id}/Faceset.png`;
 export const hunterFace = (cls) => `${ART}/chars/${cls.sprite}/Faceset.png`;
+export const animalFace = (animal) => `${ART}/animals/${animal}/Faceset.png`;
 
 // A 38 px faceset cropped into a framed box: `x`, `y` move the image inside the frame.
 function face(path, size, x, y, c) {
@@ -123,8 +124,8 @@ function chevron(self, area, c) {
 //   1. the name (its tab's), then dim the Class, the program when it isn't Claude Code and the
 //      branch when it differs from the Area's; the state's icon on the right
 //   2. the Rank grade and model; on the right the used/total tokens and the Stamina bar
-// Needs help keeps the peach frame. The strip spans the whole row, so a later Pet icon line
-// (ticket 05) goes under the face and lines, inside `body`, and the strip grows with it.
+// Needs help keeps the peach frame. The strip spans the whole row: the Pet icon line (only
+// with Pets) sits under the face and lines, inside `body`, so the strip grows with it.
 export const STRIP_W = 4;
 function hunterRow(h, c) {
   const help = h.state === "help";
@@ -143,7 +144,8 @@ function hunterRow(h, c) {
           .child(div().flex_1().min_w(0).truncate().child(plain(h.rank.label)))
           .child(h_flex().flex_none().gap(4).items_center()
             .when(h.tokens != null, (el) => el.child(div().flex_none().text_size(12).child(h.tokens?.text ?? "")))
-            .child(staminaView(h.stamina, c))))));
+            .child(staminaView(h.stamina, c))))))
+    .when(h.pets.all.length > 0, (el) => el.child(petLine(h, c)));
   return h_flex().id(`ph-hunter-${h.terminal}`).ml(16).mt(5).pr(6).py(4).gap(8).items_stretch().cursor_pointer()
     .border(FRAME).border_color(help ? c.blocked : "#00000000")
     .when(help, (el) => el.bg(`${c.blocked}12`))
@@ -151,6 +153,27 @@ function hunterRow(h, c) {
     .on_click(() => run("agent.focus", { terminal: h.terminal }))
     .child(div().w(STRIP_W).flex_none().bg(stateColor(c, h.state)))
     .child(body);
+}
+
+// A Hunter's Pets, as in layout F: one line of 18 px animal icons (the 38 px faceset scaled into
+// a 1 px frame) under the lines, indented past the face: the first 2 (hunt.js orders them),
+// then a dim [+N]. Hovering an icon shows its subagent type and task; hovering [+N] lists the
+// others. Clicking an icon focuses the Hunter's terminal, where the Pet runs.
+export const PET_ICON = 18;
+const petLabel = (p) => [p.type ?? "Pet", p.description].filter(Boolean).join(" · ");
+function petLine(h, c) {
+  const hidden = h.pets.all.slice(h.pets.shown.length);
+  return h_flex().ml(38 + 8).mt(3).gap(3).items_center()
+    .children(h.pets.shown.map((p) => div().id(`ph-pet-${h.terminal}-${p.agent}`)
+      .relative().w(PET_ICON).h(PET_ICON).flex_none().overflow_hidden()
+      .border(1).border_color(c.border).bg(c.canvas).cursor_pointer()
+      .tooltip(petLabel(p))
+      .on_click((_e, cx) => { cx.stop_propagation(); run("agent.focus", { terminal: h.terminal }); })
+      .child(image(animalFace(p.animal)).absolute().left(0).top(0).w(PET_ICON - 2).h(PET_ICON - 2))))
+    .when(h.pets.more > 0, (el) => el.child(div().id(`ph-petmore-${h.terminal}`).ml(2).flex_none()
+      .text_size(12).text_color(c.dim)
+      .tooltip(hidden.map((p) => `${p.animal}: ${petLabel(p)}`).join("\n"))
+      .child(`[+${h.pets.more}]`)));
 }
 
 // Rank's letter grade as a small mint tag ("A"), dim for "?".

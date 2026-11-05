@@ -48,7 +48,29 @@ These six files were not taken from the official zip but from the copy of the sa
 in this repo's `docs/records/2026-11-05-preview/na/` (a public mirror,
 github.com/MarioLDD/Kuroshiro-adventure). Every file that copy shares with the official zip
 (the six Monster faces and Idle strips, and the Knight, Hunter and Monk faces and poses,
-27 files) is byte-identical to it. Check them against the zip when it is at hand.
+27 files) is byte-identical to it. Checked against the official zip on 2026-11-05 (Pets
+ticket 05): all six are byte-identical to it too.
+
+Added for Pets (Pets ticket 05), from the official zip above (downloaded again 2026-11-05
+through itch's download flow, same sha256), copied pixel-exact and unchanged. Each animal
+gets one folder with its 38x38 `Faceset.png` (the sidebar's Pet icons) and its 32x16
+`SpriteSheet.png` (two 16x16 frames, for the arena's Pets). Where the pack has colour
+variants, one was picked and renamed to these two names:
+
+| Here | In the pack | Used as |
+| --- | --- | --- |
+| `animals/Cat/Faceset.png`, `SpriteSheet.png` | `Actor/Animal/Cat/Faceset.png`, `SpriteSheet.png` | Pet: Cat |
+| `animals/Dog/…` | `Actor/Animal/Dog/Faceset.png`, `SpriteSheet.png` | Pet: Dog |
+| `animals/Dog2/…` | `Actor/Animal/Dog2/Faceset.png`, `SpriteSheet.png` | Pet: Dog2 |
+| `animals/Cub/…` | `Actor/Animal/LionCub/Faceset.png`, `SpriteSheet.png` | Pet: Cub |
+| `animals/Frog/…` | `Actor/Animal/Frog/Faceset.png`, `SpriteSheet.png` | Pet: Frog |
+| `animals/Racoon/…` | `Actor/Animal/Racoon/Faceset.png`, `SpriteSheet.png` | Pet: Racoon |
+| `animals/Monkey/…` | `Actor/Animal/Monkey/FacesetBrown.png`, `SpriteSheetBrown.png` | Pet: Monkey |
+| `animals/Chicken/…` | `Actor/Animal/Chicken/FacesetWhite.png`, `SpriteSheetWhite.png` | Pet: Chicken |
+| `animals/Pig/…` | `Actor/Animal/Pig/FacesetPink.png`, `SpriteSheetPink.png` | Pet: Pig |
+| `animals/Fish/…` | `Actor/Animal/Fish/FacesetRed.png`, `SpriteSheetRed.png` | Pet: Fish |
+
+Cow, Horse and Lion are left out: they are too big for a Pet.
 
 Made from those by `tools/build-art.py` (derived, still CC0):
 

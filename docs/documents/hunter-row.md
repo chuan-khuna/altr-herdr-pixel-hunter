@@ -1,6 +1,6 @@
 # Hunter row (layout F)
 
-**Status:** built in Pets ticket 04. Design: layout **F** in `docs/records/2026-11-05-hunter-row.html`. Vocabulary follows `GLOSSARY.md` (Hunter, Class, Rank, Stamina, Needs help).
+**Status:** built in Pets ticket 04; the Pet icon line in ticket 05. Design: layout **F** in `docs/records/2026-11-05-hunter-row.html`. Vocabulary follows `GLOSSARY.md` (Hunter, Class, Rank, Stamina, Needs help).
 
 How a Hunter row in the sidebar gets its data and how it is drawn. Pane headers and tab pills read the same Hunter but draw it their own way. Layout F didn't change them.
 
@@ -18,6 +18,7 @@ How a Hunter row in the sidebar gets its data and how it is drawn. Pane headers 
 ```
 ▌ [face]  login  Knight · Codex · ⎇ fix/cart        ⚔
 ▌ [38px]  [A] Opus 5.5              128k/200k [████  ]
+▌         [Dog][Cat] [+3]
 ```
 
 - **Strip:** 4 px down the left edge, in the state colour (blue Hunting, peach Needs help, green Cleared, dim Resting).
@@ -28,6 +29,7 @@ How a Hunter row in the sidebar gets its data and how it is drawn. Pane headers 
 - **Line 2:** the grade tag and the model. On the right: used/total context tokens, then the 44 px Stamina bar. The bar shows what's **left**; the number shows what's **used**.
 - **No data:** `STA —` and no number.
 - **Needs help:** the row keeps its 2 px peach frame and peach tint.
+- **Pets** (only when the Hunter has any): a third line of 18 px animal icons, at most 2, then `[+N]`. See `pet-tracking-hooks.md` for where Pets come from.
 
 ## Data flow
 
@@ -64,7 +66,11 @@ flowchart LR
 
 - **Outer row:** `h_flex` with `items_stretch`. It is indented 16 px, with 4 px vertical and 6 px right padding, no left padding, and an 8 px gap.
 - **Strip:** a 4 px `div` with the state colour as its background. Because the row stretches its children, the strip spans the full content height.
-- **`body`:** a `v_flex` that holds one `h_flex` (the face, then the two lines). Ticket 05's Pet icon line goes into `body` as a second child under that `h_flex`, so the strip grows with it. Per the record, it is indented past the face.
+- **`body`:** a `v_flex` that holds one `h_flex` (the face, then the two lines). With Pets, `petLine()` adds the Pet icon line as a second child under that `h_flex`, so the strip grows with it:
+  - Indented 46 px (the 38 px face and the 8 px gap), 3 px below the lines, icons 3 px apart.
+  - Each icon is an 18 px `div` with a 1 px `border` frame on canvas, holding the animal's 38 px `art/animals/<Animal>/Faceset.png` scaled to 16 px. Its tooltip is `type · description`. A click runs `agent.focus` for the Hunter's terminal and stops there, so the row's own click doesn't run too.
+  - `[+N]` is 12 px `dim`, 2 px further on. Its tooltip lists the hidden Pets, one per line: `Animal: type · description`.
+  - Ticket 06 adds the 2 px peach frame for a Pet that Needs help.
 - **Line 1:**
   - The name `div` truncates but doesn't grow.
   - The dim text is `flex_1` and truncates first.

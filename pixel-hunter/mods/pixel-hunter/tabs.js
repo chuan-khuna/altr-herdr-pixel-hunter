@@ -11,6 +11,7 @@ import { spaces, run, openOverlay, window, shared, layout, settings } from "herd
 import { colors, FONT_UI, FRAME } from "./theme.js";
 import { world } from "./world.js";
 import { startPins } from "./pins.js";
+import { startPets } from "./petwatch.js";
 import { smallFace, stateColor, plain, SMALL_FACE } from "./areas.js";
 
 const ICONS = "mods/pixel-hunter/icons";
@@ -28,6 +29,7 @@ function find(node, id) {
 
 export function tabsInit(self, cx) {
   startPins(self, cx);
+  startPets(self, cx); // Pets keep the Monster alive, so every role agrees on it (world.js)
   self.pressed = null;
   try { self.panels = JSON.parse(localStorage.getItem("panels") ?? "{}") ?? {}; } catch { self.panels = {}; }
 }

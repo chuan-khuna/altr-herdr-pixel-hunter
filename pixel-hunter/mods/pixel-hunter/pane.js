@@ -17,11 +17,13 @@ import { world } from "./world.js";
 import { smallFace, gradeBadge, stateColor, stateText, plain, SMALL_FACE } from "./areas.js";
 import { startSessions } from "./sessions.js";
 import { startPins } from "./pins.js";
+import { startPets } from "./petwatch.js";
 
 export function paneInit(self, cx) {
   self.hovered = false;
   startPins(self, cx);
   startSessions(self, cx); // Rank comes from the statusLine records, like the sidebar's
+  startPets(self, cx); // Pets keep the Monster alive: every role agrees on it (world.js)
 }
 
 function programIcon(program, c) {

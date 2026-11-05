@@ -802,3 +802,116 @@ test("the shipped classes.json parses and pins nothing by default", () => {
   const cfg = JSON.parse(readFileSync(new URL("../classes.json", import.meta.url), "utf8"));
   assert.equal(classPins(cfg).size, 0);
 });
+
+// Pets: records from the Pets hook script (pets.mjs), { [terminal]: record[] }.
+const petRec = (agent, over = {}) => ({ v: 1, app: "claude-code", agent, type: "Explore", description: `task of ${agent}`,
+  animal: "Dog", state: "hunting", startedAt: 1000, seenAt: 1000, ...over });
+
+test("a Hunter shows its first 2 Pets, oldest first, and [+N] for the rest", () => {
+  const s = space();
+  const pets = { x1: [
+    petRec("p3", { animal: "Frog", startedAt: 3000 }), petRec("p1", { animal: "Cat", startedAt: 1000 }),
+    petRec("p4", { animal: "Cub", startedAt: 4000 }), petRec("p2", { animal: "Dog", startedAt: 2000 }),
+  ] };
+  const { areas } = hunt({ spaces: [s], panes: [agent(s, "x1", { status: "working", app: "claude-code" })], home: HOME, pets, now: 5000 });
+  const h = areas[0].hunters[0];
+  assert.deepEqual(h.pets.shown.map((p) => p.agent), ["p1", "p2"]);
+  assert.equal(h.pets.more, 2);
+  assert.deepEqual(h.pets.all.map((p) => p.agent), ["p1", "p2", "p3", "p4"]);
+  const { staleAt, ...first } = h.pets.shown[0];
+  assert.deepEqual(first, { agent: "p1", type: "Explore", description: "task of p1", animal: "Cat", state: "hunting", startedAt: 1000 });
+  assert.equal(staleAt, 1000 + 120 * 1000);
+  // two or fewer: no [+N]; none: an empty line the row leaves out
+  const two = hunt({ spaces: [s], panes: [agent(s, "x1")], home: HOME, pets: { x1: pets.x1.slice(0, 2) }, now: 5000 });
+  assert.equal(two.areas[0].hunters[0].pets.more, 0);
+  assert.equal(two.areas[0].hunters[0].pets.shown.length, 2);
+  const none = hunt({ spaces: [s], panes: [agent(s, "x1")], home: HOME, now: 5000 });
+  assert.deepEqual(none.areas[0].hunters[0].pets, { shown: [], more: 0, all: [] });
+});
+
+test("a Pet is dropped at exactly the stale limit, and at a custom limit from rank.json", () => {
+  const s = space();
+  const panes = [agent(s, "x1", { status: "working" })];
+  const pets = { x1: [petRec("p1", { seenAt: 10000 })] };
+  const at = (now, ranks) => hunt({ spaces: [s], panes, home: HOME, pets, ranks, now }).areas[0].hunters[0].pets.all.length;
+  const LIMIT = RANKS.petStaleAfterSeconds * 1000;
+  assert.equal(RANKS.petStaleAfterSeconds, 120);
+  assert.equal(at(10000 + LIMIT - 1), 1);
+  assert.equal(at(10000 + LIMIT), 0, "dropped at exactly the limit");
+  assert.equal(at(10000 + 29999, { petStaleAfterSeconds: 30 }), 1);
+  assert.equal(at(10000 + 30000, { petStaleAfterSeconds: 30 }), 0, "a custom limit");
+  assert.equal(at(10000 + LIMIT - 1, { petStaleAfterSeconds: -5 }), 1, "a bad limit falls back to 120 s");
+  assert.equal(rankTable({ petStaleAfterSeconds: 45 }).petStaleAfterSeconds, 45);
+  assert.equal(rankTable({ petStaleAfterSeconds: 45 }).staleAfterSeconds, RANKS.staleAfterSeconds, "the limits are separate");
+});
+
+test("Pets of closed or non-agent terminals, and bad records, are ignored", () => {
+  const s = space();
+  const panes = [agent(s, "x1"), shell(s)];
+  const pets = {
+    x1: [petRec("ok"), null, 5, petRec("noAnimal", { animal: "Lion" }), petRec("", {}), petRec("noBeat", { seenAt: "x" })],
+    [`sh-${s.id}`]: [petRec("onShell")],
+    gone: [petRec("ofClosed")],
+  };
+  const { areas } = hunt({ spaces: [s], panes, home: HOME, pets, now: 2000 });
+  assert.equal(areas[0].hunters.length, 1);
+  assert.deepEqual(areas[0].hunters[0].pets.all.map((p) => p.agent), ["ok"]);
+  // a Pet of a shell or a closed terminal doesn't keep the Monster alive
+  const quiet = hunt({ spaces: [s], panes: [shell(s)], home: HOME, pets, now: 2000 });
+  assert.equal(quiet.areas[0].mode, "idle");
+  for (const bad of [null, "x", 5, [], { x1: "nope" }]) {
+    assert.deepEqual(hunt({ spaces: [s], panes, home: HOME, pets: bad, now: 2000 }).areas[0].hunters[0].pets.all, []);
+  }
+});
+
+test("a Pet whose app differs from the pane's is ignored", () => {
+  const s = space();
+  const pets = { x1: [petRec("cc"), petRec("other", { app: "codex" }), petRec("noApp", { app: undefined })] };
+  const codex = hunt({ spaces: [s], panes: [agent(s, "x1", { app: "codex", program: "Codex" })], home: HOME, pets, now: 2000 });
+  assert.deepEqual(codex.areas[0].hunters[0].pets.all.map((p) => p.agent).sort(), ["noApp", "other"]);
+  const claude = hunt({ spaces: [s], panes: [agent(s, "x1", { app: "claude-code" })], home: HOME, pets, now: 2000 });
+  assert.deepEqual(claude.areas[0].hunters[0].pets.all.map((p) => p.agent).sort(), ["cc", "noApp"]);
+});
+
+test("a Hunting Pet keeps HP wearing down and prevents Slain while its Hunter is Cleared", () => {
+  const MIN = 60 * 1000;
+  const s = space();
+  let state = {};
+  const step = (now, status, petList) => {
+    const out = hunt({ spaces: [s], panes: [agent(s, "x1", { status })], home: HOME, state, now,
+      pets: petList ? { x1: petList } : {} });
+    state = out.state;
+    return out.areas[0];
+  };
+  assert.equal(step(0, "working").mode, "hit");
+  const cleared = step(MIN, "done", [petRec("p1", { seenAt: MIN })]);
+  assert.equal(cleared.mode, "hit", "the Pet still Hunts: the Monster lives");
+  assert.equal(cleared.wearing, true);
+  assert.equal(cleared.worst, "hunting", "the Area's dot counts the Pet");
+  assert.equal(cleared.hunters[0].state, "cleared", "the Hunter itself stays Cleared");
+  const later = step(3 * MIN, "done", [petRec("p1", { seenAt: 3 * MIN })]);
+  assert.ok(later.hp < cleared.hp, "HP keeps wearing down");
+  assert.ok(later.hp > 0);
+  const done = step(4 * MIN, "done", []);
+  assert.equal(done.mode, "slain", "once the Pet is gone the Cleared Hunter slays it");
+  // Resting Hunter, Hunting Pet: still wearing, and the Pet alone never slays it
+  state = {};
+  const resting = step(0, "idle", [petRec("p1", { seenAt: 0 })]);
+  assert.equal(resting.mode, "hit");
+  assert.equal(step(MIN, "idle", []).mode, "idle", "a Pet is never done");
+  // a stale Pet stops counting
+  state = {};
+  assert.equal(step(0, "done", [petRec("p1", { seenAt: -RANKS.petStaleAfterSeconds * 1000 })]).mode, "slain");
+});
+
+test("Pets never change Class assignment", () => {
+  const s = space({ tabs: [{ id: "ta", index: 1 }, { id: "tb", index: 2 }] });
+  const panes = [agent(s, "x1", { tab: "ta" }), agent(s, "x2", { tab: "tb" })];
+  const plain = hunt({ spaces: [s], panes, home: HOME });
+  const many = { x1: Array.from({ length: 12 }, (_, i) => petRec(`p${i}`, { animal: ["Cat", "Dog", "Frog"][i % 3], startedAt: i })) };
+  const withPets = hunt({ spaces: [s], panes, home: HOME, pets: many, now: 2000, state: {} });
+  assert.deepEqual(withPets.areas[0].hunters.map((h) => h.cls.name), plain.areas[0].hunters.map((h) => h.cls.name));
+  assert.deepEqual(withPets.state.classes, plain.state.classes);
+  assert.equal(withPets.areas[0].hunters.length, 2, "Pets are not Hunters");
+  assert.equal(withPets.areas[0].arena.hunters.length, 2, "the arena picks Hunters only");
+});

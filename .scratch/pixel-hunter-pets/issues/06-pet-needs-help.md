@@ -14,6 +14,8 @@ Ticket 01 confirmed that a subagent's `PermissionRequest` carries its `agent_id`
 
 **Blocked by:** 05
 
+**From ticket 05:** `pets.mjs` ignores `help` and `unhelp` today, and `petsOf()` in `hunt.js` sets every Pet's `state` to `hunting` (its sort already goes by `PRIORITY`). The README's Pets block lists only `subagentStatusLine`, `SubagentStart` and `SubagentStop`: add the `PermissionRequest` and `PostToolUse` hooks there.
+
 **Status:** ready-for-agent
 
 - [ ] Hook script black-box tests: `help` marks a Pet Needs help and sets `helpAt`, and `unhelp` marks it Hunting. Both do nothing without `agent_id` or for an unknown Pet. A `tasks` tick more than 2 s after `helpAt` marks it Hunting; one within 2 s leaves it in Needs help.

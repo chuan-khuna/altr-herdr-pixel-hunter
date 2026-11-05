@@ -18,7 +18,8 @@ needed: the layout names `pixel-hunter-night`. If the pixel fonts don't show at
 once, restart Herdr (they load at start and on a look change).
 
 The mod runs no programs and reaches no network. Outside its own folder it
-only reads `~/.config/herdr-app/data/pixel-hunter/sessions/` (see below).
+only reads `~/.config/herdr-app/data/pixel-hunter/sessions/` and
+`~/.config/herdr-app/data/pixel-hunter/pets/` (see below).
 
 ## Rank and Stamina (optional, Claude Code)
 
@@ -72,12 +73,66 @@ other model shows `?`. Saving the file updates the sidebar at once.
 ```json
 {
   "grades": { "Fable": "S", "Opus": "A", "Sonnet": "B", "Haiku": "C" },
-  "staleAfterSeconds": 300
+  "staleAfterSeconds": 300,
+  "petStaleAfterSeconds": 120
 }
 ```
 
-`staleAfterSeconds` is the freshness limit. A broken file falls back to these
-defaults.
+`staleAfterSeconds` is the Stamina freshness limit, and `petStaleAfterSeconds`
+the time after which a Pet that stopped reporting leaves (see Pets). A broken
+file falls back to these defaults.
+
+## Pets (optional, Claude Code)
+
+Every subagent a Claude Code Hunter starts (the Agent tool, nested ones too)
+shows as a **Pet**: a small animal icon on a line under its Hunter's row. A
+row shows at most 2, oldest first, then `[+N]`. Hovering an icon shows the
+subagent's type and the task its Hunter gave it, hovering `[+N]` lists the
+others, and clicking an icon focuses the Hunter's terminal. Pets are part of
+the Party: while one Hunts, the Monster's HP keeps wearing down and it isn't
+Slain, even if its Hunter is Cleared or Resting.
+
+Herdr can't see subagents (they run inside the Hunter's terminal), so Claude
+Code has to write them down for the mod. Without this setup no Pet is ever
+shown, and nothing is guessed. One-time setup (needs `node` on your PATH): add
+this to `~/.claude/settings.json` (or a project's `.claude/settings.json`),
+merging the hooks with any you already have:
+
+```json
+{
+  "subagentStatusLine": {
+    "type": "command",
+    "command": "node ~/.config/herdr-app/mods/pixel-hunter/pets.mjs tasks"
+  },
+  "hooks": {
+    "SubagentStart": [{ "hooks": [{ "type": "command", "command": "node ~/.config/herdr-app/mods/pixel-hunter/pets.mjs start" }] }],
+    "SubagentStop": [{ "hooks": [{ "type": "command", "command": "node ~/.config/herdr-app/mods/pixel-hunter/pets.mjs stop" }] }]
+  }
+}
+```
+
+- Nothing edits your settings for you.
+- `start` writes one file per subagent to
+  `~/.config/herdr-app/data/pixel-hunter/pets/<terminal>/<agent id>.json` for
+  the Herdr terminal it runs in (`HC_TERMINAL_ID`) and picks its animal (Cat,
+  Dog, Dog2, Cub, Frog, Racoon, Monkey, Chicken, Pig or Fish), different from
+  the terminal's other live Pets while there are animals left. `stop`
+  deletes it. Outside Herdr nothing is written.
+- `subagentStatusLine` runs every 5 s while Claude Code's agent panel lists
+  a subagent, also while the Hunter is idle. `tasks` fills in each Pet's type
+  and task (control and bidi characters stripped, 80 characters at most),
+  refreshes its heartbeat at most every 30 s and removes finished tasks. It
+  prints nothing, so the agent panel keeps its own rows. It doesn't depend on
+  the statusLine's `refreshInterval`, which stays at 60.
+- A Pet leaves when its task ends, when its Hunter's terminal closes or stops
+  being an agent, or after `petStaleAfterSeconds` (2 minutes) without a
+  report, for example after a crash.
+- A subagent that ends its turn to wait (for a background shell, or for a
+  subagent of its own) leaves too: Claude Code stops it and calls its task
+  completed. It comes back, as the same animal when that one is free, when it
+  wakes.
+- The script never blocks or breaks Claude Code: bad input changes nothing,
+  and it always exits 0.
 
 ## Pin a Class to a tab
 

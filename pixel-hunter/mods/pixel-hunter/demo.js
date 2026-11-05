@@ -1,7 +1,8 @@
 // A fixed snapshot shaped like the preview mock (docs/records/2026-11-05-preview.html) and the
 // Hunter row record (docs/records/2026-11-05-hunter-row.html, layout F), for screenshots: a
 // block with props { role: "sidebar", demo: true } draws it through the real hunt model
-// instead of the live workspace. Clicks still run real commands with these fake ids.
+// instead of the live workspace. Clicks still run real commands with these fake ids. Pets come
+// from demoPets() below.
 const H = "/Users/me";
 const tab = (id, name, index = 1) => ({ id, index, name, named: true });
 export const DEMO = {
@@ -45,5 +46,24 @@ export function demoSessions(now) {
     dx3: r("Opus 5.5 1M", 410000, 1000000),
     dx5: r("Haiku 5.5", 170000, 200000),
     dx7: { v: 1, app: "claude-code", model: "Fable 5.1", left: 41, at: now },
+  };
+}
+
+// Pet records as the Pets hook script writes them, as in the Hunter row record: login has five
+// (Dog and Cat shown, [+3] for Frog, Cub and Racoon), cart one, docs one. Pet Needs help is
+// ticket 06, so cart's Frog is Hunting for now.
+export function demoPets(now) {
+  const p = (agent, animal, type, description, age) => ({ v: 1, app: "claude-code", agent, type, description,
+    animal, state: "hunting", startedAt: now - age, seenAt: now });
+  return {
+    dx1: [
+      p("dpa1", "Dog", "Explore", "find auth middleware", 300000),
+      p("dpa2", "Cat", "general-purpose", "run the test suite", 240000),
+      p("dpa3", "Frog", "Explore", "list the session cookies", 120000),
+      p("dpa4", "Cub", "Plan", "plan the token refresh", 60000),
+      p("dpa5", "Racoon", "general-purpose", "update the login docs", 30000),
+    ],
+    dx2: [p("dpb1", "Frog", "Plan", "draft the price migration", 90000)],
+    dx5: [p("dpc1", "Dog2", "Explore", "collect merged PR titles", 45000)],
   };
 }

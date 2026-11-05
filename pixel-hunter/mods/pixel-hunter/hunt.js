@@ -22,8 +22,13 @@
 //           (null: not known yet), the context tokens used and the window's size in tokens
 //           (missing in records from before ticket 04), written at `at` ms. Bad fields are
 //           ignored; nothing is estimated.
-//   ranks   optional { grades: { [word]: grade }, staleAfterSeconds } (rank.json); missing or
-//           bad parts fall back to RANKS
+//   pets    optional { [terminal]: record[] } from the Pets hook script (pets.mjs), one record
+//           per Claude Code subagent: { app, agent, type, description, animal, state, startedAt,
+//           seenAt }. Only a Hunter's own terminal's records count (nested subagents are Pets of
+//           the same Hunter); records of a closed or non-agent terminal, of another app, or seen
+//           petStaleAfterSeconds ago or more are ignored. See petsOf()
+//   ranks   optional { grades: { [word]: grade }, staleAfterSeconds, petStaleAfterSeconds }
+//           (rank.json); missing or bad parts fall back to RANKS
 //   pins    optional { tabs: { [tabName]: className } } (classes.json): every Hunter in a tab with
 //           that name has that Class, whatever it had before. Names match trimmed and ignoring
 //           case; an unknown Class or a bad entry is ignored. See classPins()
@@ -38,7 +43,8 @@
 //           monster the current Monster, { id: "GiantRacoon", name: "Giant Racoon" } (id: the
 //                   pack's sprite folder): the map's own until the Area's first Respawn, then
 //                   the one the last Respawn picked (see monsterStep)
-//           worst   the worst hunt state in the Party, or null with no Hunters
+//           worst   the worst hunt state in the Party (Hunters and their Pets), or null with no
+//                   Hunters
 //           path    the first terminal's folder for display ("~/code/x", shortened when long);
 //                   while it has no cwd the space's folder, then home ("~"); never "undefined"
 //           branch  the git branch of that folder (the terminal's, or the space's), null
@@ -47,7 +53,8 @@
 //                   (Needs help, Hunting, Cleared, Resting; ties keep their order), and how
 //                   many more there are (shown as "+N")
 //           hp      the Monster's HP now, 0..HP_MAX (cosmetic); 0 only when Slain
-//           mode    "hit" while anyone in the Party is Hunting, "slain" once nobody is Hunting
+//           mode    "hit" while anyone in the Party (a Hunter or a Pet) is Hunting, "slain" once
+//                   nobody is Hunting
 //                   and someone's agent is done (Cleared, or seen and Resting with the core
 //                   still saying done); it stays Slain until someone Hunts again (Respawn
 //                   with full HP); else "idle"
@@ -60,7 +67,7 @@
 //                   tab's first Hunter in pane order (its face), or null with no agent (a map
 //                   icon); worst its most urgent hunt state (the dot), or null; hunters how many
 //   hunters [{ terminal, pane, tab, name, cls, state, status, program, programLabel, rank, stamina,
-//              tokens, branch, focused }]
+//              tokens, pets, branch, focused }]
 //           name    the Hunter's name: its Herdr tab's name, or its Class name when the tab has none
 //           cls     { name: "Knight", sprite: "Knight" }
 //           programLabel the program's name when it isn't Claude Code ("Codex"), else null (also
@@ -74,6 +81,11 @@
 //           tokens  { used: 128000, size: 200000, text: "128k/200k" }: context tokens used and the
 //                   window's size, as Claude Code reported them; null without both, or while
 //                   used is still 0 (no response yet). Never computed from the percentages.
+//           pets    { shown, more, all }: its Pets, most urgent first, then oldest; shown the first
+//                   PETS_SHOWN (2) for the row's icons, more how many others ("[+N]"). Each Pet:
+//                   { agent, type, description, animal, state: "hunting", startedAt, staleAt }
+//                   (staleAt: when it is dropped unless it reports again). Pets have no Class
+//                   or Rank and never change the Hunters' Classes
 //           state   "hunting" | "help" | "cleared" | "resting"
 //           branch  its own branch only when it differs from its Area's, else null
 //   panes   [{ pane, terminal, tab, space, hunter, program, path, branch, focused, frame }], every
@@ -347,11 +359,13 @@ function assignClasses(order, old, pinned = {}) {
 export const RANKS = {
   grades: { Fable: "S", Opus: "A", Sonnet: "B", Haiku: "C" },
   staleAfterSeconds: 300,
+  petStaleAfterSeconds: 120,
 };
 export const STAMINA_HIGH = 50; // this % and up: blue (working)
 export const STAMINA_LOW = 20; // below this %: peach (blocked); in between: cream (foreground)
 
-/** The grade table and freshness limit from rank.json's parsed contents, defaults filled in. */
+/** The grade table and the freshness limits (Stamina records, Pets) from rank.json's parsed
+ *  contents, defaults filled in. */
 export function rankTable(cfg) {
   const obj = (v) => v && typeof v === "object" && !Array.isArray(v);
   const grades = obj(cfg) && obj(cfg.grades)
@@ -359,8 +373,11 @@ export function rankTable(cfg) {
       .filter(([k, v]) => k.trim() && typeof v === "string" && v.trim())
       .map(([k, v]) => [k.trim(), v.trim()]))
     : RANKS.grades;
-  const s = obj(cfg) ? cfg.staleAfterSeconds : undefined;
-  return { grades, staleAfterSeconds: Number.isFinite(s) && s > 0 ? s : RANKS.staleAfterSeconds };
+  const limit = (key) => {
+    const s = obj(cfg) ? cfg[key] : undefined;
+    return Number.isFinite(s) && s > 0 ? s : RANKS[key];
+  };
+  return { grades, staleAfterSeconds: limit("staleAfterSeconds"), petStaleAfterSeconds: limit("petStaleAfterSeconds") };
 }
 
 const words = (text) => text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
@@ -418,6 +435,37 @@ export function programLabel(program, app) {
   return /^claude([\s_-]*code)?$/i.test(name) ? null : name;
 }
 
+// Pets: Claude Code subagents, from the Pets hook script's records (pets.mjs). The 10 small
+// animals of the pack a Pet can be, in the script's order.
+export const ANIMALS = ["Cat", "Dog", "Dog2", "Cub", "Frog", "Racoon", "Monkey", "Chicken", "Pig", "Fish"];
+/** How many Pet icons a Hunter row shows; the rest are counted as "[+N]". */
+export const PETS_SHOWN = 2;
+
+/** A Hunter's Pets from its terminal's records: those of the pane's app, seen within
+ *  petStaleAfterSeconds (dropped at exactly the limit), most urgent first (by PRIORITY; every
+ *  Pet is Hunting for now), then oldest. A record without an agent id, a known animal or a
+ *  heartbeat is ignored; nothing is guessed. */
+export function petsOf(records, app, table, now) {
+  const limit = table.petStaleAfterSeconds * 1000;
+  const all = (Array.isArray(records) ? records : [])
+    .filter((r) => r && typeof r === "object" && typeof r.agent === "string" && r.agent
+      && ANIMALS.includes(r.animal) && Number.isFinite(r.seenAt))
+    .filter((r) => !(app && typeof r.app === "string" && r.app && r.app !== app))
+    .filter((r) => now < r.seenAt + limit)
+    .map((r) => ({
+      agent: r.agent,
+      type: typeof r.type === "string" && r.type.trim() ? r.type.trim() : null,
+      description: typeof r.description === "string" ? r.description.trim() : "",
+      animal: r.animal,
+      state: "hunting",
+      startedAt: Number.isFinite(r.startedAt) ? r.startedAt : r.seenAt,
+      staleAt: r.seenAt + limit,
+    }))
+    .sort((a, b) => PRIORITY.indexOf(a.state) - PRIORITY.indexOf(b.state) || a.startedAt - b.startedAt
+      || (a.agent < b.agent ? -1 : a.agent > b.agent ? 1 : 0));
+  return { shown: all.slice(0, PETS_SHOWN), more: Math.max(0, all.length - PETS_SHOWN), all };
+}
+
 function rankOf(rec, program, table) {
   const label = rec?.model ?? program;
   const grade = rec?.model ? gradeFor(rec.model, table.grades) : "?";
@@ -459,13 +507,14 @@ function monsterView(r, now) {
   };
 }
 
-export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}, sessions = {}, ranks, pins, now = 0, random = Math.random } = {}) {
+export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}, sessions = {}, pets = {}, ranks, pins, now = 0, random = Math.random } = {}) {
   now = Number.isFinite(now) ? now : 0;
   random = typeof random === "function" ? random : Math.random;
   spaces = (spaces ?? []).filter((s) => s && s.id != null);
   panes = (panes ?? []).filter(Boolean);
   keys = keys ?? {};
   sessions = sessions && typeof sessions === "object" ? sessions : {};
+  pets = pets && typeof pets === "object" ? pets : {};
   const table = rankTable(ranks);
   state = state && typeof state === "object" ? state : {};
   const perSpace = spaces.map((s) => spacePanes(s, panes));
@@ -517,6 +566,7 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
         rank: rankOf(rec, program, table),
         stamina: staminaOf(rec, table, now),
         tokens: tokensOf(rec),
+        pets: petsOf(pets[p.terminal], p.app, table, now),
         branch: p.branch && p.branch !== branch ? p.branch : null,
         focused: !!p.focused,
       };
@@ -546,7 +596,7 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       named: !!s.named,
       current: !!s.active,
       map,
-      worst: worstState(hunters.map((h) => h.state)),
+      worst: worstState(hunters.flatMap((h) => [h.state, ...h.pets.all.map((pet) => pet.state)])),
       path: displayPath(where, home),
       branch,
       key: typeof keys[index + 1] === "string" ? keys[index + 1] : null,
@@ -555,9 +605,11 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       tabs: tabsOf(s.tabs, hunters),
       expanded: areaExpanded({ current: !!s.active, help, collapsed: collapsed[s.id] }),
       held: help,
-      ...monsterView((monsters[s.id] = monsterStep(oldMonsters[s.id], agentsOf(ps).map((p) => ({
-        state: huntState(p.status), done: p.status === "done" || p.report === "done",
-      })), now, map.monsters[0].id, random)), now),
+      // the Party: the Hunters, and their Pets, which are never done
+      ...monsterView((monsters[s.id] = monsterStep(oldMonsters[s.id], [
+        ...agentsOf(ps).map((p) => ({ state: huntState(p.status), done: p.status === "done" || p.report === "done" })),
+        ...hunters.flatMap((h) => h.pets.all.map((pet) => ({ state: pet.state, done: false }))),
+      ], now, map.monsters[0].id, random)), now),
       monster: MONSTER_BY_ID.get(monsters[s.id].id) ?? map.monsters[0],
     };
   });

@@ -6,7 +6,8 @@ Every space is a hunting **Area** with its own map and Monster, and every agent 
 current Area's Hunters fight its Monster, then every Area with its Party underneath:
 each Hunter by its tab's name with its Class, a strip and icon for what it's doing
 (⚔ Hunting, ! Needs help, ✓ Cleared, z Resting), its model as a letter-graded Rank, and
-its context as used/total tokens beside a Stamina bar of what's left. The tab bar and
+its context as used/total tokens beside a Stamina bar of what's left. Under a Hunter, its
+Claude Code subagents show as **Pets**, small animal icons. The tab bar and
 every pane header carry the Hunters' faces. Everything is drawn on a faded blue-cyan
 dark theme with square 2 px frames, Pixelify Sans and CC0 sprites from the Ninja
 Adventure pack. Whatever needs you is peach.
@@ -79,6 +80,11 @@ Left to right:
        up, cream `#c5ccb8` from 20% to 50%, peach `#f3a787` below 20%. `STA —` with no data,
        and then no number. A record from before the tokens shows the bar alone. An old
        record shows `old` (12 px) between the number and a `dim` fill.
+     - only when the Hunter has **Pets**, a third line under the face and the two lines,
+       3 px below them and indented 46 px (past the face): up to 2 Pet icons, 3 px apart,
+       oldest first, then `[+N]` (12 px, `dim`, 2 px further) for the rest. An icon is
+       18 px: a 1 px `border` frame on canvas around the animal's 38 px faceset scaled to
+       16 px. The strip grows down with the line.
      - A Hunter that Needs help gets a 2 px peach frame and a faint peach tint
        (`#f3a78712`) around its row. Other rows show `surface` on hover.
 
@@ -135,14 +141,15 @@ current one.
 | `idle` | Resting | `z RESTING`, dim `#7e9e99` | idles with a 14 px dim `z` that floats up and fades over 2.4 s while anyone in the Area is Hunting or Needs help, and holds still otherwise |
 
 - The Area's dot, a tab's dot and the arena's order use the most urgent state: Needs
-  help > Hunting > Cleared > Resting. The arena shows four Hunters picked that way (ties
+  help > Hunting > Cleared > Resting. The Area's dot also counts its Hunters' Pets (a
+  Hunting Pet makes it blue); tab dots and the arena count Hunters only. The arena shows four Hunters picked that way (ties
   keep their order) and `+N` for the rest.
 - Herdr shows `done` only until someone looks, then `idle`, so a Hunter you've seen
   finish reads Resting.
 
 **The Monster** (per Area, cosmetic):
 
-- While anyone in the Party is Hunting, it plays its Idle strip (160 ms a frame, there and
+- While anyone in the Party (a Hunter, or one of their Pets) is Hunting, it plays its Idle strip (160 ms a frame, there and
   back) and, once every 5 s, its Hit strip once through, there and back, at 90 ms a frame
   (`2 × frames × 90 ms`: 540 ms for 3 frames, 720 ms for 4, 1440 ms for the Tengu's 8; the
   Giant Racoon has no Hit strip and plays its 4-frame Attack). It shakes 2 px either way
@@ -151,7 +158,7 @@ current one.
   2.5 s after the Party starts Hunting (or the arena shows this Area). Its HP wears down: it halves its way toward 5 every 4 minutes (100, 52
   after 4 min, 29 after 8), so only Slain reaches 0. The sidebar redraws once every 10 s
   for this, and only while some HP is wearing.
-- With nobody Hunting and somebody's agent done (Herdr's `done`, or herdr-core still
+- With nobody Hunting (no Pet either) and somebody's agent done (Herdr's `done`, or herdr-core still
   saying `done` after Herdr shows it as seen), the Monster is **Slain**: HP drops to 0
   (the bars drain over 600 ms), `HP` turns to `SLAIN`, and the Monster drops 14 px and
   fades to 35% over 600 ms. It stays Slain until someone Hunts again.
@@ -162,8 +169,8 @@ current one.
 - With someone Needing help but nobody Hunting it idles (its Idle strip, 160 ms a frame);
   with everyone Resting or Cleared it stands still on its first frame. HP pauses.
 - HP, Slain and the current Monster are kept across restarts (Herdr's shared state).
-- With nobody Hunting or Needing help and no Stamina record about to go old, nothing
-  redraws: no loops, no timers.
+- With nobody Hunting or Needing help, no Stamina record about to go old and no Pet,
+  nothing redraws: no loops, no timers.
 
 **Areas**:
 
@@ -201,6 +208,26 @@ current one.
   older than `staleAfterSeconds` (300) is shown `old`. Without a record a Hunter shows
   `?`, its program and `STA —`; nothing is ever estimated. Saving `rank.json` regrades at
   once.
+
+**Pets** (only with the optional Claude Code hook setup; without it none is ever shown):
+
+- Each Claude Code subagent (the Agent tool; nested ones too, flattened) is a Pet of the
+  Hunter whose terminal runs it, with one of 10 animals: Cat, Dog, Dog2, Cub, Frog, Racoon,
+  Monkey, Chicken, Pig, Fish. The hook script picks it at the subagent's start, one the
+  terminal's other live Pets don't have while any are left, the first try seeded from the
+  subagent's id, so one that stops and starts again under the same id comes back as the
+  same animal when it's free.
+- Pets have no Class or Rank, never change the Hunters' Classes, and are always Hunting
+  (Needs help for Pets isn't built). They are Party members: a Hunting Pet keeps HP
+  wearing and the Monster from being Slain, also while its Hunter is Cleared or Resting.
+- Shown: the oldest 2, then `[+N]`. Hovering an icon shows `type · task`
+  (`Explore · find auth middleware`); hovering `[+N]` lists the hidden ones, one per line
+  (`Frog: Explore · list the session cookies`). Clicking an icon focuses the Hunter's
+  terminal (`agent.focus`).
+- A Pet leaves when its subagent stops or its task ends, when its Hunter's terminal closes
+  or stops being an agent, when its record's `app` isn't the pane's, or once it hasn't
+  reported for `petStaleAfterSeconds` (120, in `rank.json`), dropped at exactly that
+  limit. The sidebar's one wake-up timer also arms for the next Pet to go.
 
 **Tabs**: click selects (`tab.select`), double-click renames (`tab.rename`), press on one
 tab and release on another moves it there (`tab.move`), right-click opens Herdr's tab
@@ -253,12 +280,13 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
   draws the fixed `demo.js` snapshot instead, for screenshots), `tabs` (`tabs.js`), `pane`
   (`pane.js`; Herdr adds `pane` and `terminal` to its props).
 - `hunt.js`: the hunt model, pure and with no Herdr imports:
-  `hunt({ spaces, panes, home, keys, state, sessions, ranks, pins, now, random }) -> { areas, panes, state }`.
+  `hunt({ spaces, panes, home, keys, state, sessions, pets, ranks, pins, now, random }) -> { areas, panes, state }`.
   Maps, Monsters, Classes, states, arena pick, HP, Slain, Respawn, open or closed, Rank,
-  Stamina, tokens, Hunter names (`name`, `programLabel`, `tokens` on each Hunter) and
-  pins are all decided here, with time passed in, and `random` (default
+  Stamina, tokens, Hunter names (`name`, `programLabel`, `tokens` on each Hunter), Pets
+  (`pets: { shown, more, all }` on each Hunter, each Pet `{ agent, type, description,
+  animal, state, startedAt, staleAt }`) and pins are all decided here, with time passed in, and `random` (default
   `Math.random`) used only for the Respawn pick. Tests: `node --test` in the mod folder
-  (`test/hunt.test.js`, `test/statusline.test.js`, 59 cases).
+  (`test/hunt.test.js`, `test/statusline.test.js`, `test/pets.test.js`, 76 cases).
 - `world.js`: the only place that reads Herdr for the model (`spaces()`, `panes()`,
   `terminals()` for herdr-core's own `done`, `keys()`, `home()`). It keeps the model's
   state in `shared("pixel-hunter.state")`:
@@ -268,8 +296,14 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
 - `sessions.js`: reads `rank.json` once per load, and watches
   `<Herdr home>/data/pixel-hunter/sessions/` (`watchFolder`, creating the folder), re-reading
   the records (at most 256) on each change. Run by the sidebar and every pane header.
-- `pins.js`: reads `classes.json` once per load. Until it's read, `world()` writes no state.
-- `rank.json`: `{ "grades": { "Fable": "S", "Opus": "A", "Sonnet": "B", "Haiku": "C" }, "staleAfterSeconds": 300 }`.
+- `petwatch.js`: watches `<Herdr home>/data/pixel-hunter/pets/` (`watchFolder`, creating
+  the folder), re-reading `<terminal>/<agent>.json` (plain names only, at most 64
+  terminals and 256 records) on each change into `{ [terminal]: record[] }`. Run by the
+  sidebar, the tab bar and every pane header, because Pets change the Monster's saved
+  state and every copy must agree.
+- `pins.js`: reads `classes.json` once per load. Until it and the Pets are read,
+  `world()` writes no state.
+- `rank.json`: `{ "grades": { "Fable": "S", "Opus": "A", "Sonnet": "B", "Haiku": "C" }, "staleAfterSeconds": 300, "petStaleAfterSeconds": 120 }`.
 - `classes.json`: ships as `{ "tabs": {} }`.
 - `statusline.mjs`: the optional Claude Code statusLine script, plain Node with no Herdr
   imports. Run by Claude Code (not by Herdr) with
@@ -281,6 +315,20 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
   caps text at 80 characters, rewrites an unchanged record at most once a minute, writes
   nothing outside a Herdr terminal, prints `Opus 5.5 · 62% context left` (nothing with
   `--quiet`) and always exits 0.
+- `pets.mjs`: the optional Claude Code Pets hook script, plain Node with no Herdr imports,
+  run by Claude Code with `"subagentStatusLine": { "type": "command", "command": "node
+  ~/.config/herdr-app/mods/pixel-hunter/pets.mjs tasks" }` and the hooks `SubagentStart`
+  (`pets.mjs start`) and `SubagentStop` (`pets.mjs stop`). `start` writes
+  `{ v: 1, app: "claude-code", terminal, session, agent, type, description, animal,
+  state: "hunting", startedAt, seenAt, startAt }` to
+  `<Herdr home>/data/pixel-hunter/pets/<HC_TERMINAL_ID>/<agent_id>.json` and clears
+  another session's records not seen for 120 s; `stop` deletes it; `tasks` matches
+  `tasks[].id` to records, fills in `type` (`agentType`) and `description` (never
+  `label`), refreshes `seenAt` at most every 30 s unless something changed, and deletes
+  a `completed`, `failed` or `killed` task's record unless it started again under 10 s
+  ago. `$PIXEL_HUNTER_PETS` overrides the folder. Same rules as the statusLine script:
+  plain ids only, control and bidi characters stripped, 80 characters, temp file and
+  rename, nothing outside Herdr, exit 0; it prints nothing.
 - `theme.js`: font names, `FRAME = 2`, the night colours as fallbacks.
 - `icons/`: 8-bit SVGs drawn on a pixel grid: `map.svg`, `files.svg`, `changes.svg`
   (16 px), `chevron-open.svg`, `chevron-closed.svg` (5 x 5 grid at 10 px).
@@ -296,7 +344,7 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
 **`herdr` functions used**: `props`, `spaces`, `panes`, `terminals`, `keys`, `home`,
 `shared`, `setShared`, `run`, `openOverlay`, `window`, `layout`, `settings`, `theme`,
 `appHome`, `readTextFile`, `watchFolder`; plus `fs/promises` `readdir` / `mkdir` for the
-sessions folder and `localStorage` key `panels` (the tab bar's per-space panel memory). It
+sessions and pets folders and `localStorage` key `panels` (the tab bar's per-space panel memory). It
 reads `shared("workspace.panels")` to know which panel buttons to show.
 
 **Commands run**: `space.select`, `space.move`, `agent.focus`, `tab.select`, `tab.rename`,
@@ -312,8 +360,8 @@ panel), `menu` and `new-menu` (popups), and icons from `mods/pane/` (`zoom`, `un
 
 **Programs, network, files**: the mod runs no programs (`exec`, `hc`) and reaches no
 network. Outside its own folder it reads (and creates) only
-`<Herdr home>/data/pixel-hunter/sessions/`. The statusLine script, if the person sets it
-up, writes there.
+`<Herdr home>/data/pixel-hunter/sessions/` and `<Herdr home>/data/pixel-hunter/pets/`. The
+statusLine and Pets scripts, if the person sets them up, write there.
 
 **Art** (`art/`, all from the **Ninja Adventure Asset Pack** by pixel-boy and AAA,
 CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
@@ -327,6 +375,10 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   3 x 40; Racoon `Attack.png` 4 x 60). Monsters are aligned by their feet (the row under
   their lowest opaque pixel): Racoon 55 (Attack 60), Cyclop 43, Spirit 48, Tengu 51 (Hit
   60), Red Samurai 44 (Hit 46), Frog 33.
+- `animals/<Animal>/Faceset.png` (38 x 38, the Pet icons) and `SpriteSheet.png` (32 x 16,
+  two 16 x 16 frames, for the arena later) for Cat, Dog, Dog2, Cub (the pack's LionCub),
+  Frog, Racoon, Monkey (Brown), Chicken (White), Pig (Pink) and Fish (Red). Cow, Horse and
+  Lion are left out.
 - `tiles/`: TilesetNature, TilesetField, TilesetFloor, TilesetFloorDetail, TilesetWater,
   TilesetDungeon (sources for the arenas).
 - `arena/` and `x4/`: made by `tools/build-art.py` (still CC0).
@@ -355,6 +407,17 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   statusLine's `HC_TERMINAL_ID` must reach the script (herdr-core sets it in the
   terminal's environment). Records of closed terminals aren't deleted; they go stale and
   show only if a live agent pane has that terminal id.
+- **Pets need the hook setup**: `subagentStatusLine` plus the `SubagentStart` and
+  `SubagentStop` hooks in the person's own Claude Code settings (the README has the
+  block; the mod never edits it), and `node` on PATH. The `subagentStatusLine` ticks
+  every 5 s on its own while Claude Code's agent panel has a row; it doesn't need the
+  statusLine's `refreshInterval`. A Pet that hasn't reported for 2 minutes
+  (`petStaleAfterSeconds`) leaves, so a crashed session can't keep a Monster alive.
+- **A waiting subagent isn't a Pet.** When a subagent ends its turn to wait for a
+  background shell or its own subagent, Claude Code fires `SubagentStop` and calls its
+  task `completed`, so its Pet leaves (and the Monster can fall) until it wakes with a
+  new `SubagentStart` under the same id. Right after that start the ticks may still say
+  `completed`, so `tasks` leaves a record alone for 10 s after its last start.
 - **Pins match named tabs only.** An unnamed tab is called by its number, which changes
   when tabs move, so it never matches a pin. A removed pin keeps the Hunter's Class until
   it closes.
@@ -362,8 +425,8 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   finished agent reads Resting at once. The Slain rule also reads herdr-core's own status
   (`terminals()`), which keeps `done`, so the Monster still falls.
 - **HP needs a slow redraw.** Herdr doesn't redraw the sidebar while an agent works, so
-  the sidebar arms one 10 s one-shot timer while HP wears (and one for the moment a
-  Stamina record turns old). Don't add repeating timers; nothing else redraws on its own.
+  the sidebar arms one 10 s one-shot timer while HP wears (or for the moment a
+  Stamina record turns old, or the next Pet is due to leave, whichever is first). Don't add repeating timers; nothing else redraws on its own.
 - **GPUI smooths scaled images.** Every sprite drawn bigger than 1:1 uses a 4x
   nearest-neighbour copy from `art/x4/` drawn at 2x. Herdr caches images by file name, so
   a changed arena needs a new name (`ARENA_VERSION` in `arena.js` and `tools/build-art.py`).
@@ -374,7 +437,7 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
 - **`herdr-app check` renders the mod without props**, so it only checks the role-less
   `div`. A role that throws at render (`.flex_shrink()` with no argument, say) passes the
   check. Always look at the real window (`herdr-app shot`, `herdr-app status`).
-- **Every pane header runs the whole model** and its own session-folder watch. Fine for a
+- **Every pane header runs the whole model** and its own session- and pets-folder watches. Fine for a
   handful of panes.
 - **Monster frames** play as stacked images inside nested linear opacity loops (GPUI
   clamps opacity, so a loop from -1000 to 1000 works as a square wave); there is no
@@ -383,7 +446,7 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   frames are bands of that last stretch, so the phase rising then falling plays them there
   and back; the Idle strip shows the rest of the time. Loops built in one render share
   their phase, which keeps the Hit frames in step with the show/hide.
-- Limits: four Hunters in the arena, six Classes and six maps before they repeat, 256
+- Limits: two Pet icons per Hunter, four Hunters in the arena, six Classes and six maps before they repeat, 256
   session records, paths 30 characters in Area rows and 48 in pane headers, tab names
   170 px.
 - Windows paths (`C:\Users\me\code\x`) show with their own separator, home matched
@@ -394,7 +457,7 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
 ## Done when
 
 - `herdr-app check ~/.config/herdr-app/mods/pixel-hunter` passes, and `node --test` in that
-  folder passes all 59 tests.
+  folder passes all 76 tests.
 - `layout.switch pixel-hunter` shows the 320 px sidebar (logo, arena, Area list), the 44 px
   tab bar and framed panes with 30 px Hunter headers; `herdr-app status` lists no errors.
 - `PIXEL HUNTER` is in Press Start 2P and the rest in Pixelify Sans; frames are square 2 px.
@@ -415,6 +478,10 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   `{"model":{"display_name":"Opus 5.5"},"context_window":{"total_input_tokens":76000,"context_window_size":200000,"remaining_percentage":62}}`
   into `HC_TERMINAL_ID=<its terminal> node statusline.mjs` turns it into `A Opus 5.5` with
   `76k/200k` beside a blue Stamina bar.
+- With the Pets setup, a Claude Code Hunter that starts 4 background subagents shows 2 animal
+  icons and `[+2]` under its row, the count drops as they finish, and the line goes when
+  the last one does. A record whose `seenAt` is 110 s old disappears about 10 s later
+  on its own.
 - `{ "tabs": { "<a named tab>": "Samurai" } }` in `classes.json` turns that tab's Hunter
   into a Samurai in the sidebar, the arena, the tab face and the pane header without a
   restart.
