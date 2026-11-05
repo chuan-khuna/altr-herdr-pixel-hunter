@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // pixel-hunter's optional Claude Code statusLine script (plain Node, no Herdr imports).
 //
-// Claude Code runs it with the session as JSON on stdin. It records the model's name and the
-// context window left for the Herdr terminal it runs in (HC_TERMINAL_ID, set by herdr-core),
-// so the sidebar can show Rank and Stamina, and prints a short status line of its own.
+// Claude Code runs it with the session as JSON on stdin. It records the model's name, the
+// context window left and the context tokens used and in all for the Herdr terminal it runs
+// in (HC_TERMINAL_ID, set by herdr-core), so the sidebar can show Rank, Stamina and tokens,
+// and prints a short status line of its own.
 //
 //   ~/.claude/settings.json:
 //     "statusLine": { "type": "command", "refreshInterval": 60,
@@ -11,10 +12,14 @@
 //   --quiet   record only, print nothing (to call it from a status line script of your own)
 //
 // Record: <sessions dir>/<terminal>.json =
-//   { v: 1, app: "claude-code", terminal, session, model, modelId, left, at }
+//   { v: 1, app: "claude-code", terminal, session, model, modelId, left, used, size, at }
 //   model/modelId: model.display_name / model.id, with control and bidi characters stripped
 //   left: context_window.remaining_percentage (else 100 - used_percentage), null when Claude
 //         Code hasn't said yet; never estimated from anything else
+//   used: context_window.total_input_tokens, the context tokens in use (0 before the first
+//         response), null when Claude Code doesn't report it
+//   size: context_window.context_window_size, the whole window in tokens (200000, 1000000),
+//         null when not reported. Neither is ever computed from the percentages.
 //   at:   when it was written (ms); the sidebar marks a record older than its limit as "old"
 // Sessions dir: $PIXEL_HUNTER_SESSIONS, else <Herdr home>/data/pixel-hunter/sessions with
 // Herdr home $HERDR_APP_HOME or ~/.config/herdr-app.
@@ -39,6 +44,9 @@ function clean(text) {
   return out || null;
 }
 
+// A token count as Claude Code reports it: a whole number, 0 or more, else null.
+const tokens = (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v) : null);
+
 const pct = (v) => (typeof v === "number" && Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : null);
 
 /** The session record from Claude Code's statusLine JSON (parsed), or null if it isn't one. */
@@ -50,7 +58,10 @@ function recordFrom(input, terminal, now) {
   const used = pct(cw.used_percentage);
   const name = clean(model.display_name) ?? clean(model.id);
   const left = remaining ?? (used == null ? null : 100 - used);
-  if (name == null && left == null) return null; // nothing to show: keep the last record
+  const usedTokens = tokens(cw.total_input_tokens);
+  const size = tokens(cw.context_window_size) || null; // a window of 0 tokens isn't one
+  // nothing to show: keep the last record
+  if (name == null && left == null && usedTokens == null && size == null) return null;
   return {
     v: 1,
     app: "claude-code",
@@ -59,6 +70,8 @@ function recordFrom(input, terminal, now) {
     model: name,
     modelId: clean(model.id),
     left,
+    used: usedTokens,
+    size,
     at: now,
   };
 }
@@ -82,7 +95,7 @@ function line(rec) {
   return parts.join(" · ");
 }
 
-const same = (a, b) => a && b && ["app", "session", "model", "modelId", "left"].every((k) => a[k] === b[k]);
+const same = (a, b) => a && b && ["app", "session", "model", "modelId", "left", "used", "size"].every((k) => a[k] === b[k]);
 
 function save(dir, rec, now) {
   const file = join(dir, `${rec.terminal}.json`);

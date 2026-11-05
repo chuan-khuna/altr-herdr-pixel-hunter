@@ -22,7 +22,7 @@ const SESSION = {
   session_id: "abc-123",
   cwd: "/Users/me/code/shop-api",
   model: { id: "claude-opus-5-5", display_name: "Opus 5.5" },
-  context_window: { context_window_size: 200000, used_percentage: 38, remaining_percentage: 62 },
+  context_window: { total_input_tokens: 76000, context_window_size: 200000, used_percentage: 38, remaining_percentage: 62 },
 };
 
 test("Claude Code's JSON on stdin gives the terminal's session record and a status line", () => {
@@ -33,7 +33,7 @@ test("Claude Code's JSON on stdin gives the terminal's session record and a stat
   const { at, ...rest } = r.record;
   assert.deepEqual(rest, {
     v: 1, app: "claude-code", terminal: "t7", session: "abc-123",
-    model: "Opus 5.5", modelId: "claude-opus-5-5", left: 62,
+    model: "Opus 5.5", modelId: "claude-opus-5-5", left: 62, used: 76000, size: 200000,
   });
   assert.ok(at >= before && at <= Date.now());
   assert.deepEqual(readdirSync(r.dir), ["t7.json"], "no temporary files are left behind");
@@ -48,6 +48,44 @@ test("context left comes from Claude Code only: 100 - used without remaining, nu
   const noWindow = run(JSON.stringify({ session_id: "x", model: { id: "claude-haiku-5" } }));
   assert.equal(noWindow.record.left, null);
   assert.equal(noWindow.record.model, "claude-haiku-5", "the model id stands in for a missing display name");
+});
+
+test("context tokens are recorded as Claude Code reports them, and null when it does not", () => {
+  const big = run(JSON.stringify({ ...SESSION, model: { id: "claude-opus-5-5[1m]", display_name: "Opus 5.5 (1M context)" },
+    context_window: { total_input_tokens: 410000, context_window_size: 1000000, used_percentage: 41, remaining_percentage: 59 } }));
+  assert.equal(big.record.used, 410000);
+  assert.equal(big.record.size, 1000000);
+  // the first tick: used 0, the percentages null; the window size is already known
+  const first = run(JSON.stringify({ ...SESSION, context_window: { total_input_tokens: 0, context_window_size: 200000,
+    current_usage: null, used_percentage: null, remaining_percentage: null } }));
+  assert.equal(first.record.used, 0);
+  assert.equal(first.record.size, 200000);
+  assert.equal(first.record.left, null);
+  // absent token fields: null, never computed from the percentages
+  const none = run(JSON.stringify({ ...SESSION, context_window: { used_percentage: 38, remaining_percentage: 62 } }));
+  assert.equal(none.record.left, 62);
+  assert.equal(none.record.used, null, "not 38% of anything");
+  assert.equal(none.record.size, null);
+  const noWindow = run(JSON.stringify({ session_id: "x", model: { id: "claude-haiku-5" } }));
+  assert.equal(noWindow.record.used, null);
+  assert.equal(noWindow.record.size, null);
+  // odd values are not used
+  const odd = run(JSON.stringify({ ...SESSION, context_window: { total_input_tokens: "lots", context_window_size: -5, remaining_percentage: 50 } }));
+  assert.equal(odd.record.used, null);
+  assert.equal(odd.record.size, null);
+  const zero = run(JSON.stringify({ ...SESSION, context_window: { total_input_tokens: 10, context_window_size: 0 } }));
+  assert.equal(zero.record.size, null, "a window of 0 tokens is not a window");
+  // tokens alone still make a record
+  const only = run(JSON.stringify({ context_window: { total_input_tokens: 5000, context_window_size: 200000 } }));
+  assert.equal(only.record.used, 5000);
+  assert.equal(only.record.model, null);
+});
+
+test("a change in used tokens is written at once", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ph-sl-"));
+  run(JSON.stringify(SESSION), { dir });
+  const more = run(JSON.stringify({ ...SESSION, context_window: { ...SESSION.context_window, total_input_tokens: 77000 } }), { dir });
+  assert.equal(more.record.used, 77000);
 });
 
 test("control and bidi characters are stripped from everything written and printed", () => {

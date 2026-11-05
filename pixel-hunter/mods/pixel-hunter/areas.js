@@ -118,24 +118,39 @@ function chevron(self, area, c) {
     .child(svg(`mods/pixel-hunter/icons/chevron-${area.expanded ? "open" : "closed"}.svg`).size(10).flex_none());
 }
 
+// A Hunter row, layout F of docs/records/2026-11-05-hunter-row.html: a 4 px strip in the state
+// colour down the left edge, the 38 px face, and two lines:
+//   1. the name (its tab's), then dim the Class, the program when it isn't Claude Code and the
+//      branch when it differs from the Area's; the state's icon on the right
+//   2. the Rank grade and model; on the right the used/total tokens and the Stamina bar
+// Needs help keeps the peach frame. The strip spans the whole row, so a later Pet icon line
+// (ticket 05) goes under the face and lines, inside `body`, and the strip grows with it.
+export const STRIP_W = 4;
 function hunterRow(h, c) {
   const help = h.state === "help";
-  return h_flex().id(`ph-hunter-${h.terminal}`).ml(16).mt(5).px(6).py(4).gap(8).items_center().cursor_pointer()
+  const extra = [h.cls.name, h.programLabel, h.branch ? `⎇ ${h.branch}` : null].filter(Boolean).join(" · ");
+  const body = v_flex().flex_1().min_w(0)
+    .child(h_flex().gap(8).items_center()
+      .child(face(hunterFace(h.cls), 38, 0, 0, c))
+      .child(v_flex().flex_1().min_w(0).gap(1)
+        .child(h_flex().min_w(0).gap(6).items_center()
+          .child(div().min_w(0).truncate().font_semibold().text_color(c.foreground).child(plain(h.name)))
+          .child(div().flex_1().min_w(0).truncate().text_size(13).text_color(c.dim).child(plain(extra)))
+          .child(div().id(`ph-st-${h.terminal}`).flex_none().text_size(13).font_semibold().text_color(stateColor(c, h.state))
+            .tooltip(STATES[h.state].label).child(STATES[h.state].icon)))
+        .child(h_flex().min_w(0).gap(6).items_center().text_size(13).text_color(c.dim)
+          .child(gradeBadge(h.rank, c))
+          .child(div().flex_1().min_w(0).truncate().child(plain(h.rank.label)))
+          .child(h_flex().flex_none().gap(4).items_center()
+            .when(h.tokens != null, (el) => el.child(div().flex_none().text_size(12).child(h.tokens?.text ?? "")))
+            .child(staminaView(h.stamina, c))))));
+  return h_flex().id(`ph-hunter-${h.terminal}`).ml(16).mt(5).pr(6).py(4).gap(8).items_stretch().cursor_pointer()
     .border(FRAME).border_color(help ? c.blocked : "#00000000")
     .when(help, (el) => el.bg(`${c.blocked}12`))
     .when(!help, (el) => el.hover((s) => s.bg(c.surface)))
     .on_click(() => run("agent.focus", { terminal: h.terminal }))
-    .child(face(hunterFace(h.cls), 38, 0, 0, c))
-    .child(v_flex().flex_1().min_w(0).gap(1)
-      .child(h_flex().gap(8).items_center()
-        .child(div().flex_none().font_semibold().text_color(c.foreground).child(h.cls.name))
-        .child(div().flex_none().text_size(13).font_semibold().text_color(stateColor(c, h.state)).child(stateText(h.state).toUpperCase())))
-      .child(h_flex().min_w(0).gap(6).items_center().text_size(13.5).text_color(c.dim)
-        .child(gradeBadge(h.rank, c))
-        .child(div().flex_none().child(plain(h.rank.label)))
-        .when(Boolean(h.branch), (el) => el.child(div().min_w(0).truncate().child(`· ⎇ ${plain(h.branch)}`)))
-        .child(div().flex_1())
-        .child(staminaView(h.stamina, c))));
+    .child(div().w(STRIP_W).flex_none().bg(stateColor(c, h.state)))
+    .child(body);
 }
 
 // Rank's letter grade as a small mint tag ("A"), dim for "?".
@@ -144,9 +159,9 @@ export function gradeBadge(rank, c) {
     .bg(rank.grade === "?" ? c.dim : c.accent).child(plain(rank.grade));
 }
 
-// Stamina as a 46 px bar: blue (working) from 50%, cream (foreground) from 20%, peach
+// Stamina as a 44 px bar (what's left): blue (working) from 50%, cream (foreground) from 20%, peach
 // (blocked) below, never blinking. "STA —" with no data; a stale record is drawn dim with "old".
-export const STAMINA_W = 46;
+export const STAMINA_W = 44;
 const STAMINA_COLOR = { high: "working", mid: "foreground", low: "blocked" };
 export function staminaView(st, c) {
   if (st.percent == null) return div().flex_none().text_color(c.dim).child("STA —");

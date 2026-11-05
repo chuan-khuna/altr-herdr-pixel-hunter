@@ -18,8 +18,10 @@
 //   keys    optional { [spaceIndexFrom1]: "⌃1" }, the shortcut that selects each space
 //   state   persisted state from last time (see below); unknown fields are kept as they are
 //   sessions optional { [terminal]: record } from the statusLine script (statusline.mjs):
-//           { app, model, left, at }: the model's name, the context window left in % (null:
-//           not known yet), written at `at` ms. Bad fields are ignored; nothing is estimated.
+//           { app, model, left, used, size, at }: the model's name, the context window left in %
+//           (null: not known yet), the context tokens used and the window's size in tokens
+//           (missing in records from before ticket 04), written at `at` ms. Bad fields are
+//           ignored; nothing is estimated.
 //   ranks   optional { grades: { [word]: grade }, staleAfterSeconds } (rank.json); missing or
 //           bad parts fall back to RANKS
 //   pins    optional { tabs: { [tabName]: className } } (classes.json): every Hunter in a tab with
@@ -57,14 +59,21 @@
 //           tabs    [{ id, index, lead, worst, hunters }] in tab order, for the tab bar: lead is the
 //                   tab's first Hunter in pane order (its face), or null with no agent (a map
 //                   icon); worst its most urgent hunt state (the dot), or null; hunters how many
-//   hunters [{ terminal, pane, tab, cls, state, status, program, rank, stamina, branch, focused }]
+//   hunters [{ terminal, pane, tab, name, cls, state, status, program, programLabel, rank, stamina,
+//              tokens, branch, focused }]
+//           name    the Hunter's name: its Herdr tab's name, or its Class name when the tab has none
 //           cls     { name: "Knight", sprite: "Knight" }
+//           programLabel the program's name when it isn't Claude Code ("Codex"), else null (also
+//                   with no program known)
 //           rank    { grade: "A", label: "Opus 5.5", text: "[A] Opus 5.5" }: grade "?" for a
 //                   model the table doesn't know; with no record, "?" and the program's name
 //           stamina { percent: 62, level: "high" | "mid" | "low", stale, staleAt }, or with no
 //                   record or no number in it { percent: null, level: null, stale: false,
 //                   staleAt: null } (shown as "STA —"). stale: the record is older than
 //                   staleAfterSeconds (shown as "old"); staleAt: when a fresh one turns stale
+//           tokens  { used: 128000, size: 200000, text: "128k/200k" }: context tokens used and the
+//                   window's size, as Claude Code reported them; null without both, or while
+//                   used is still 0 (no response yet). Never computed from the percentages.
 //           state   "hunting" | "help" | "cleared" | "resting"
 //           branch  its own branch only when it differs from its Area's, else null
 //   panes   [{ pane, terminal, tab, space, hunter, program, path, branch, focused, frame }], every
@@ -379,7 +388,34 @@ function sessionRecord(r, app) {
   if (app && typeof r.app === "string" && r.app && r.app !== app) return null;
   const model = typeof r.model === "string" && r.model.trim() ? r.model.trim() : null;
   const left = Number.isFinite(r.left) ? Math.min(100, Math.max(0, r.left)) : null;
-  return model || left != null ? { model, left, at: r.at } : null;
+  const count = (v) => (Number.isFinite(v) && v >= 0 ? Math.round(v) : null);
+  const used = count(r.used);
+  const size = count(r.size) || null;
+  return model || left != null || (used != null && size != null) ? { model, left, used, size, at: r.at } : null;
+}
+
+/** A token count as people read it: "950", "128k", "1M", "1.5M" (k and M in thousands). */
+export function tokenText(n) {
+  if (!Number.isFinite(n) || n < 0) return "";
+  const k = Math.round(n / 1000);
+  if (k >= 1000) return `${Math.round(n / 100000) / 10}M`;
+  return n < 1000 ? String(Math.round(n)) : `${k}k`;
+}
+
+// Context tokens used / window size, from the record; null without both or before the first
+// response (used 0).
+function tokensOf(rec) {
+  if (!rec || !(rec.used > 0) || !(rec.size > 0)) return null;
+  return { used: rec.used, size: rec.size, text: `${tokenText(rec.used)}/${tokenText(rec.size)}` };
+}
+
+/** The program's name to show beside the Class: null for Claude Code (the usual one) and
+ *  for no program at all, else the name as Herdr gives it ("Codex"). */
+export function programLabel(program, app) {
+  if (app === "claude-code") return null;
+  const name = typeof program === "string" ? program.trim() : "";
+  if (!name || name === "?") return null;
+  return /^claude([\s_-]*code)?$/i.test(name) ? null : name;
 }
 
 function rankOf(rec, program, table) {
@@ -463,19 +499,24 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
     const where = cwd || text(s.folder) || text(home);
     const branch = text(cwd ? first.branch : s.branch) || null;
     const map = mapFor(index);
+    const tabName = new Map((s.tabs ?? []).filter(Boolean).map((t) => [t.id, text(t.name).trim()]));
     const hunters = agentsOf(ps).map((p) => {
       const program = p.program || "?";
       const rec = sessionRecord(sessions[p.terminal], p.app);
+      const cls = byName[classes[p.terminal]];
       return {
         terminal: p.terminal,
         pane: p.pane,
         tab: p.tab,
-        cls: byName[classes[p.terminal]],
+        name: tabName.get(p.tab) || cls.name,
+        cls,
         state: huntState(p.status),
         status: p.status,
         program,
+        programLabel: programLabel(p.program, p.app),
         rank: rankOf(rec, program, table),
         stamina: staminaOf(rec, table, now),
+        tokens: tokensOf(rec),
         branch: p.branch && p.branch !== branch ? p.branch : null,
         focused: !!p.focused,
       };

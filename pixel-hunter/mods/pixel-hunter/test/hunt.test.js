@@ -553,6 +553,67 @@ test("a record older than the freshness limit is marked stale, with when it turn
   assert.equal(rankTable({ staleAfterSeconds: -1 }).staleAfterSeconds, RANKS.staleAfterSeconds);
 });
 
+// Hunter row layout F (Pets ticket 04): name, program label, tokens
+
+test("a Hunter is named after its tab; a tab without a name gives the Class name", () => {
+  const a = space({ tabs: [
+    { id: "tn-1", index: 1, name: "login", named: true },
+    { id: "tn-2", index: 2, name: "2", named: false },
+    { id: "tn-3", index: 3, name: "  " },
+    { id: "tn-4", index: 4 },
+    { id: "tn-5", index: 5, name: 42 },
+  ] });
+  const panes = ["tn-1", "tn-1", "tn-2", "tn-3", "tn-4", "tn-5"].map((tab, i) => agent(a, `n${i}`, { tab }));
+  const hs = hunt({ spaces: [a], panes, home: HOME }).areas[0].hunters;
+  assert.deepEqual(hs.map((h) => h.name), ["login", "login", "2", "Rogue", "Monk", "Samurai"]);
+  assert.deepEqual(hs.map((h) => h.cls.name), ["Knight", "Mage", "Archer", "Rogue", "Monk", "Samurai"],
+    "the name never changes the Class");
+});
+
+test("programLabel is null for Claude Code and the program's name otherwise", () => {
+  const a = space();
+  const panes = [
+    agent(a, "cc", { program: "Claude Code", app: "claude-code" }),
+    agent(a, "cc2", { program: "Claude Code" }),
+    agent(a, "cc3", { program: "claude" }),
+    agent(a, "cx", { program: "Codex", app: "codex" }),
+    agent(a, "gm", { program: "Gemini" }),
+    agent(a, "no", { program: "" }),
+  ];
+  const hs = hunt({ spaces: [a], panes, home: HOME }).areas[0].hunters;
+  assert.deepEqual(hs.map((h) => h.programLabel), [null, null, null, "Codex", "Gemini", null]);
+});
+
+test("tokens read used/size for 200k and 1M windows, and are null without data", () => {
+  const hs = hunters({
+    a: rec({ used: 128000, size: 200000, left: 36 }),
+    b: rec({ model: "Opus 5.5 (1M context)", used: 410000, size: 1000000, left: 59 }),
+    c: rec({ used: 1499, size: 200000 }),
+    d: rec({ used: 0, size: 200000, left: null }), // the first tick: no response yet
+    e: rec({ used: 5000 }), // no size
+    f: rec({ used: "lots", size: 200000 }),
+  });
+  assert.deepEqual(hs[0].tokens, { used: 128000, size: 200000, text: "128k/200k" });
+  assert.deepEqual(hs[1].tokens, { used: 410000, size: 1000000, text: "410k/1M" });
+  assert.equal(hs[2].tokens.text, "1k/200k");
+  for (const h of hs.slice(3)) assert.equal(h.tokens, null, h.terminal);
+  assert.deepEqual(hs[3].stamina.percent, null, "the first tick still shows STA —");
+  const none = hunt({ spaces: [space({ id: "tk" })], panes: [agent({ id: "tk", tabs: [{ id: "tk-t1" }] }, "q")], home: HOME });
+  assert.equal(none.areas[0].hunters[0].tokens, null, "no record: no tokens");
+  // a record with tokens only still gives them (and STA — with no percentage)
+  const only = hunters({ o: { v: 1, app: "claude-code", used: 64000, size: 200000, at: 0 } })[0];
+  assert.equal(only.tokens.text, "64k/200k");
+  assert.equal(only.stamina.percent, null);
+});
+
+test("an old record without tokens shows only the bar", () => {
+  const [h] = hunters({ o: { v: 1, app: "claude-code", model: "Opus 5.5", left: 72, at: 0 } });
+  assert.equal(h.tokens, null);
+  assert.equal(h.stamina.percent, 72);
+  assert.equal(h.stamina.level, "high");
+  assert.equal(h.rank.text, "[A] Opus 5.5");
+});
+
 // Tabs and pane headers (ticket 07)
 
 test("each tab shows its first Hunter in pane order, its worst state, and none without an agent", () => {

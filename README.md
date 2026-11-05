@@ -23,7 +23,8 @@ only reads `~/.config/herdr-app/data/pixel-hunter/sessions/` (see below).
 ## Rank and Stamina (optional, Claude Code)
 
 Each Hunter row shows its **Rank** (a letter grade and the model, like
-`[A] Opus 5.5`) and its **Stamina** (the context window left, as a bar).
+`[A] Opus 5.5`), the context tokens used out of the window (`128k/200k`,
+`410k/1M`) and its **Stamina** (the context window left, as a bar).
 Herdr doesn't know either, so they come from a small Claude Code
 [statusLine](https://docs.claude.com/en/docs/claude-code/statusline) script
 that ships with the mod. Without it every Hunter shows its program name
@@ -43,7 +44,9 @@ One-time setup (needs `node` on your PATH): add this to `~/.claude/settings.json
 ```
 
 - The script reads the session JSON Claude Code sends it, and writes the
-  model's name and `context_window.remaining_percentage` for the Herdr
+  model's name, `context_window.remaining_percentage`,
+  `context_window.total_input_tokens` and `context_window.context_window_size`
+  for the Herdr
   terminal it runs in (`HC_TERMINAL_ID`) to
   `~/.config/herdr-app/data/pixel-hunter/sessions/<terminal>.json`. Control
   and bidi characters are stripped. Outside Herdr it writes nothing.
@@ -56,7 +59,9 @@ One-time setup (needs `node` on your PATH): add this to `~/.claude/settings.json
   because Claude Code only runs the script when the conversation changes.
 
 Stamina is blue at 50% and up, cream from 20% to 50%, peach below 20%, and
-dim with `old` once the record is older than the limit.
+dim with `old` once the record is older than the limit. The token number
+shows only once Claude Code has reported both numbers and the first response
+is in; a record written by an older copy of the script shows the bar alone.
 
 ### The grade table
 

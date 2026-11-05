@@ -4,8 +4,9 @@ A monster-hunting, 8-bit pixel RPG skin for Herdr with only original characters.
 Every space is a hunting **Area** with its own map and Monster, and every agent is a
 **Hunter** in that Area's Party. A 320 px sidebar shows a little top-down arena where the
 current Area's Hunters fight its Monster, then every Area with its Party underneath:
-each Hunter's Class, what it's doing (⚔ Hunting, ! Needs help, ✓ Cleared, z Resting),
-its model as a letter-graded Rank and its context left as a Stamina bar. The tab bar and
+each Hunter by its tab's name with its Class, a strip and icon for what it's doing
+(⚔ Hunting, ! Needs help, ✓ Cleared, z Resting), its model as a letter-graded Rank, and
+its context as used/total tokens beside a Stamina bar of what's left. The tab bar and
 every pane header carry the Hunters' faces. Everything is drawn on a faded blue-cyan
 dark theme with square 2 px frames, Pixelify Sans and CC0 sprites from the Ninja
 Adventure pack. Whatever needs you is peach.
@@ -57,19 +58,27 @@ Left to right:
      the space's own folder, then `~`; never `undefined`.
    - Line 3 (13 px, `foreground`, truncated): `⎇ branch`, the git branch of that folder.
      Empty outside git (the line keeps its height).
-   - When open, the Area lists its **Hunter rows** under it, indented 16 px, 5 px apart,
-     each with 6 x 4 px padding and an 8 px gap:
-     - a 38 px Hunter face in a 2 px `border` frame;
-     - line 1: the Class (semibold) and the state label in capitals, 13 px semibold, in
-       the state's colour: `⚔ HUNTING` blue, `! NEEDS HELP` peach, `✓ CLEARED` green,
-       `z RESTING` dim;
-     - line 2 (13.5 px, `dim`): the Rank, a grade tag (12 px semibold `#101a24` text on a
-       mint block, on `dim` for `?`) then the model (`Opus 5.5`), or with no record the
-       program (`Claude Code`, `codex`); then `· ⎇ branch` only when the Hunter's branch
-       differs from its Area's; then on the right the **Stamina** bar: 46 px, 2 px `border`
-       frame on canvas, 8 px fill, blue `#7ca1c0` at 50% and up, cream `#c5ccb8` from 20%
-       to 50%, peach `#f3a787` below 20%. `STA —` (`dim`) with no data. An old record
-       shows `old` (12 px `dim`) before a `dim` fill.
+   - When open, the Area lists its **Hunter rows** under it (layout F of the Hunter row
+     record), indented 16 px, 5 px apart, each with 4 px top and bottom and 6 px right
+     padding, no left padding, and 8 px gaps:
+     - a **state strip**, 4 px wide, down the row's whole height (inside the padding), in
+       the state's colour: blue `#7ca1c0` Hunting, peach `#f3a787` Needs help, green
+       `#6eaa78` Cleared, `dim` `#7e9e99` Resting;
+     - a 38 px Hunter face in a 2 px `border` frame, beside two lines (1 px apart, 6 px gaps);
+     - line 1: the Hunter's **name**, its Herdr tab's name (semibold, `foreground`,
+       truncated; `tab 1` for a tab nobody named, the Class name if the tab has none), then
+       in 13 px `dim`, truncated, joined by ` · `: the Class, the program only when it isn't
+       Claude Code (`Codex`), and `⎇ branch` only when the Hunter's branch differs from its
+       Area's (`Mage · ⎇ fix/cart`); on the right the state's icon alone, 13 px semibold in
+       the state's colour (`⚔`, `!`, `✓`, `z`), with the state's name as its tooltip;
+     - line 2 (13 px, `dim`): the Rank, a grade tag (12 px semibold `#101a24` text on a
+       mint block, on `dim` for `?`) then the model (`Opus 5.5`, truncated), or with no
+       record the program (`Claude Code`, `Codex`); on the right the context tokens used
+       and the window, 12 px (`128k/200k`, `410k/1M`), 4 px from the **Stamina** bar: 44 px,
+       2 px `border` frame on canvas, 8 px fill of what's left, blue `#7ca1c0` at 50% and
+       up, cream `#c5ccb8` from 20% to 50%, peach `#f3a787` below 20%. `STA —` with no data,
+       and then no number. A record from before the tokens shows the bar alone. An old
+       record shows `old` (12 px) between the number and a `dim` fill.
      - A Hunter that Needs help gets a 2 px peach frame and a faint peach tint
        (`#f3a78712`) around its row. Other rows show `surface` on hover.
 
@@ -103,8 +112,8 @@ current one.
      under it, 3 px left and 8 px right padding, 8 px gaps, 14 px text:
      - a Hunter's pane: its 24 px face, the Class (semibold), the grade tag, the Rank
        label (max 160 px), then `dim` `folder · ⎇ branch` (the pane's own folder, `~` for
-       home, cut past 48 characters), then on the right the state label as in the sidebar
-       (13 px semibold);
+       home, cut past 48 characters), then on the right the state label in capitals,
+       13 px semibold in the state's colour (`⚔ HUNTING`);
      - a shell: the program's 14 px icon and name (semibold), then folder and branch;
      - a mod pane (Files in a pane, say): its title;
      - `ZOOM` (13 px, `dim`) when zoomed; on hover, Herdr's split right, split down, zoom
@@ -118,7 +127,7 @@ current one.
 
 **Agent statuses** (Herdr's status for each agent's terminal, from OSC 7501):
 
-| Herdr status | Hunt state | Label and colour | Arena |
+| Herdr status | Hunt state | Pane header label (the row: icon and strip) and colour | Arena |
 | --- | --- | --- | --- |
 | `blocked` | Needs help | `! NEEDS HELP`, peach `#f3a787`, peach row frame, peach pane header | the Hunter's Item pose (hand raised) with a 20 px peach `!` blinking every 400 ms |
 | `working` | Hunting | `⚔ HUNTING`, blue `#7ca1c0` | swaps Idle and Attack every 520 ms, the Attack 6 px forward (a lunge) |
@@ -182,9 +191,12 @@ current one.
   An unknown Class or a broken file is ignored. Removing a pin keeps the Hunter's current
   Class until it closes. Saving the file updates the sidebar, tabs and pane headers at once.
 - Clicking a Hunter row shows its agent (`agent.focus`).
-- **Rank and Stamina** come only from the optional Claude Code statusLine script
-  `statusline.mjs`. It records the model's name and `context_window.remaining_percentage`
-  per Herdr terminal. `rank.json` grades the model: the first of `Fable` S, `Opus` A,
+- **Rank, Stamina and tokens** come only from the optional Claude Code statusLine script
+  `statusline.mjs`. It records the model's name, `context_window.remaining_percentage`,
+  `context_window.total_input_tokens` (used) and `context_window.context_window_size`
+  (the window) per Herdr terminal. Tokens show as thousands (`128k`) or millions (`1M`,
+  `1.5M`); with used still 0 (no response yet) or either number missing, no number shows.
+  Neither the number nor the bar is ever worked out from the other. `rank.json` grades the model: the first of `Fable` S, `Opus` A,
   `Sonnet` B, `Haiku` C found as a word in its name (ignoring case), else `?`. A record
   older than `staleAfterSeconds` (300) is shown `old`. Without a record a Hunter shows
   `?`, its program and `STA —`; nothing is ever estimated. Saving `rank.json` regrades at
@@ -243,9 +255,10 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
 - `hunt.js`: the hunt model, pure and with no Herdr imports:
   `hunt({ spaces, panes, home, keys, state, sessions, ranks, pins, now, random }) -> { areas, panes, state }`.
   Maps, Monsters, Classes, states, arena pick, HP, Slain, Respawn, open or closed, Rank,
-  Stamina and pins are all decided here, with time passed in, and `random` (default
+  Stamina, tokens, Hunter names (`name`, `programLabel`, `tokens` on each Hunter) and
+  pins are all decided here, with time passed in, and `random` (default
   `Math.random`) used only for the Respawn pick. Tests: `node --test` in the mod folder
-  (`test/hunt.test.js`, `test/statusline.test.js`, 53 cases).
+  (`test/hunt.test.js`, `test/statusline.test.js`, 59 cases).
 - `world.js`: the only place that reads Herdr for the model (`spaces()`, `panes()`,
   `terminals()` for herdr-core's own `done`, `keys()`, `home()`). It keeps the model's
   state in `shared("pixel-hunter.state")`:
@@ -261,7 +274,8 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
 - `statusline.mjs`: the optional Claude Code statusLine script, plain Node with no Herdr
   imports. Run by Claude Code (not by Herdr) with
   `"statusLine": { "type": "command", "command": "node ~/.config/herdr-app/mods/pixel-hunter/statusline.mjs", "refreshInterval": 60 }`.
-  It writes `{ v: 1, app: "claude-code", terminal, session, model, modelId, left, at }` to
+  It writes `{ v: 1, app: "claude-code", terminal, session, model, modelId, left, used, size, at }`
+  (`used` and `size` are the context tokens Claude Code reports, null when it doesn't) to
   `<Herdr home>/data/pixel-hunter/sessions/<HC_TERMINAL_ID>.json` (`$PIXEL_HUNTER_SESSIONS`
   overrides the folder, `$HERDR_APP_HOME` the home), strips control and bidi characters,
   caps text at 80 characters, rewrites an unchanged record at most once a minute, writes
@@ -333,7 +347,7 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   and Changes buttons (and Herdr's own per-space panel memory) look for them.
 - The shipped Files and Changes panels draw their own slightly rounded inner corners;
   only the layout's own frames are square.
-- **Rank and Stamina need the statusLine script**, which needs `node` on PATH and the
+- **Rank, Stamina and tokens need the statusLine script**, which needs `node` on PATH and the
   person's own `~/.claude/settings.json` (the mod never edits it). Claude Code runs a
   statusLine only when the conversation changes unless `refreshInterval` is set, so set
   `refreshInterval: 60`, or an idle session goes `old` after the 5-minute limit. Only
@@ -380,14 +394,15 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
 ## Done when
 
 - `herdr-app check ~/.config/herdr-app/mods/pixel-hunter` passes, and `node --test` in that
-  folder passes all 53 tests.
+  folder passes all 59 tests.
 - `layout.switch pixel-hunter` shows the 320 px sidebar (logo, arena, Area list), the 44 px
   tab bar and framed panes with 30 px Hunter headers; `herdr-app status` lists no errors.
 - `PIXEL HUNTER` is in Press Start 2P and the rest in Pixelify Sans; frames are square 2 px.
 - Each space is an Area with the next map (Forest, Desert, Dungeon, ...) and its Monster's
   76 px face; the arena shows the current Area's map and Monster.
 - A fake agent (a terminal printing `ESC ] 7501 ; state=working BEL`) appears as a Hunter
-  with the next Class and `⚔ HUNTING`; the Monster idles and plays its Hit strip, shaking,
+  named after its tab, with the next Class and its program dim after it (`Knight · bash`),
+  a blue strip and `⚔`; the Monster idles and plays its Hit strip, shaking,
   once every 5 s, and the arena's HP bar wears down.
 - `state=blocked`: the row and the pane header turn peach, the arena Hunter raises a hand
   under a blinking `!`, and its Area opens and can't be closed.
@@ -397,9 +412,9 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
   `layout.switch main` and back.
 - With nobody Hunting or Needing help, two shots a few seconds apart are identical.
 - Without the statusLine script every Hunter shows `?`, its program and `STA —`. Piping
-  `{"model":{"display_name":"Opus 5.5"},"context_window":{"remaining_percentage":62}}` into
-  `HC_TERMINAL_ID=<its terminal> node statusline.mjs` turns it into `A Opus 5.5` with a blue
-  Stamina bar.
+  `{"model":{"display_name":"Opus 5.5"},"context_window":{"total_input_tokens":76000,"context_window_size":200000,"remaining_percentage":62}}`
+  into `HC_TERMINAL_ID=<its terminal> node statusline.mjs` turns it into `A Opus 5.5` with
+  `76k/200k` beside a blue Stamina bar.
 - `{ "tabs": { "<a named tab>": "Samurai" } }` in `classes.json` turns that tab's Hunter
   into a Samurai in the sidebar, the arena, the tab face and the pane header without a
   restart.
