@@ -100,6 +100,7 @@
   .term .box { border: 1px solid var(--help); padding: 6px 8px; margin-top: 8px; display: block; }
 
   /* ---------- galleries ---------- */
+  #monsters { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
   .g { padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .g .stage { width: 100%; height: 110px; display: grid; place-items: center; background: var(--canvas); border: 2px solid var(--border); position: relative; }
@@ -159,7 +160,12 @@
 
   <h2>Monsters</h2>
   <p class="sub">Bosses are 40 to 68 px with real multi-frame Idle and Hit animations. Hit plays while the Party is Hunting.</p>
+  <p class="sub">Revised later on 2026-11-05: this gallery now shows all 12 bosses in the pack, including the six the app doesn't use yet, so one can be picked from the list. The Red Warlord was drawn wrong: its frames are 96×48 (swords out to the sides), not 48×48 squares, so each frame showed half the samurai. The 96×48 frames fix it.</p>
   <div class="grid ui" id="monsters"></div>
+
+  <h2>Small monsters</h2>
+  <p class="sub">Added later on 2026-11-05: all 58 small monsters in the pack. Each is a 16×16 sprite (the same size as a Hunter) shown at 3×, walking down. These have no Idle or Hit strips, only a 4-frame walk per direction.</p>
+  <div class="grid ui" id="smalls"></div>
 
   <h2>Areas</h2>
   <p class="sub">Each arena is 160×96 art px built from the pack's tiles and shown at 2×. Following Valve's "quiet world" rule, every arena is desaturated and sunk toward the canvas color so the sprites stand out.</p>
@@ -187,15 +193,31 @@ const HUNTERS = [
   { cls: 'Monk',    ch: 'Monk',          rank: ['C','Haiku 5.5'],  sta: 90 },
   { cls: 'Samurai', ch: 'Samurai',       rank: ['S','Fable 5.1'],  sta: 15 },
 ];
-// frame sizes read from the PNGs
-const MONSTERS = {
-  forest:   { id: 'GiantRacoon',     name: 'Giant Racoon',  idle: ['Idle.png', 60, 6],       hit: ['Attack.png', 60, 4] },
-  desert:   { id: 'DemonCyclop',     name: 'Demon Cyclops', idle: ['Idle.png', 50, 5],       hit: ['Hit.png', 50, 3] },
-  dungeon:  { id: 'GiantSpirit',     name: 'Giant Spirit',  idle: ['Idle.png', 50, 5],       hit: ['Hit.png', 50, 3] },
-  field:    { id: 'TenguBlue',       name: 'Blue Tengu',    idle: ['Idle.png', 68, 6],       hit: ['Hit.png', 68, 8] },
-  ruins:    { id: 'GiantRedSamurai', name: 'Red Warlord',   idle: ['Idle.png', 48, 12],      hit: ['Hit.png', 48, 8] },
-  lakeside: { id: 'GiantFrog',       name: 'Giant Frog',    idle: ['Idle40x40.png', 40, 5],  hit: ['Hit.png', 40, 3] },
+// Every boss in the pack. Strips are [file, frame width, frames, frame height (default = width)],
+// read from the PNGs. The two samurai have 96x48 frames (swords out to the sides), not 48x48 squares.
+const BOSSES = {
+  GiantRacoon:      { name: 'Giant Racoon',        idle: ['Idle.png', 60, 6],      hit: ['Attack.png', 60, 4] },
+  GiantRacoonGold:  { name: 'Gold Racoon',         idle: ['Idle.png', 60, 6],      hit: ['Attack.png', 60, 4] },
+  DemonCyclop:      { name: 'Demon Cyclops',       idle: ['Idle.png', 50, 5],      hit: ['Hit.png', 50, 3] },
+  DemonCyclop2:     { name: 'Demon Cyclops (alt)', idle: ['Idle.png', 50, 5],      hit: ['Hit.png', 50, 3] },
+  GiantSpirit:      { name: 'Giant Spirit',        idle: ['Idle.png', 50, 5],      hit: ['Hit.png', 50, 3] },
+  GiantFlam:        { name: 'Giant Flame',         idle: ['Idle.png', 50, 5],      hit: ['Hit.png', 50, 3] },
+  TenguBlue:        { name: 'Blue Tengu',          idle: ['Idle.png', 68, 6],      hit: ['Hit.png', 68, 8] },
+  TenguRed:         { name: 'Red Tengu',           idle: ['Idle.png', 82, 6],      hit: ['Hit.png', 82, 8] },
+  GiantRedSamurai:  { name: 'Red Warlord',         idle: ['Idle.png', 96, 6, 48],  hit: ['Hit.png', 96, 4, 48] },
+  GiantBlueSamurai: { name: 'Blue Warlord',        idle: ['Idle.png', 96, 6, 48],  hit: ['Hit.png', 96, 4, 48] },
+  GiantFrog:        { name: 'Giant Frog',          idle: ['Idle40x40.png', 40, 5], hit: ['Hit.png', 40, 3] },
+  GiantFrog2:       { name: 'Giant Frog (alt)',    idle: ['Idle.png', 40, 5],      hit: ['Hit.png', 40, 3] },
 };
+const MAP_BOSS = { forest: 'GiantRacoon', desert: 'DemonCyclop', dungeon: 'GiantSpirit', field: 'TenguBlue', ruins: 'GiantRedSamurai', lakeside: 'GiantFrog' };
+const MONSTERS = Object.fromEntries(Object.entries(MAP_BOSS).map(([map, id]) => [map, { id, ...BOSSES[id] }]));
+// The pack's small monsters: a 64x64 sheet, columns = direction (down, up, left, right), rows = 4 walk frames.
+const SMALL = ['Axolot','AxolotBlue','Bamboo','BambooYellow','Beast','Beast2','Butterfly','ButterflyBlue','Cyclope','Cyclope2',
+  'Dragon','DragonYellow','Eye','Eye2','Fish','FishRed','Flam','Flam2','GoldRacoon','HeartGreen','HeartRed','KappaGreen','KappaRed',
+  'LanternGreen','LanternRed','Larva','Larva2','Lizard','Lizard2','Mole','Mole2','Mollusc','Mollusc2','Mouse','MouseBlack',
+  'Mushroom','Mushroom2','Octopus','Octopus2','Owl','Owl2','Racoon','Reptile','Reptile2','Skull','SkullBlue',
+  'Slime','Slime2','Slime3','Slime4','Snake','Snake2','Snake3','Snake4','SpiderRed','SpiderYellow','Spirit','Spirit2'];
+const words = id => id.replace(/([a-z])([A-Z0-9])/g, '$1 $2');
 const MAPS = ['forest','desert','dungeon','field','ruins','lakeside'];
 const cap = s => s[0].toUpperCase() + s.slice(1);
 
@@ -248,24 +270,35 @@ function setHunter(el, state) {
     el.insertAdjacentHTML('beforeend', '<span class="zz">z</span>');
   }
 }
-function monsterEl(map, s = 2) {
-  const m = MONSTERS[map], fw = m.idle[1];
+// A boss sprite; `id` is a BOSSES key. Sized by its Idle frame.
+function monsterEl(id, s = 2) {
+  const [, fw, , fh = fw] = BOSSES[id].idle;
   const el = document.createElement('div');
-  el.className = 'spr'; el.style.width = el.style.height = fw*s + 'px';
-  el.dataset.map = map; el.dataset.s = s;
+  el.className = 'spr'; el.style.width = fw*s + 'px'; el.style.height = fh*s + 'px';
+  el.dataset.id = id; el.dataset.s = s;
   return el;
 }
 function setMonster(el, mode) {
-  const m = MONSTERS[el.dataset.map], s = +el.dataset.s;
+  const id = el.dataset.id, m = BOSSES[id], s = +el.dataset.s;
   el.getAnimations().forEach(a => a.cancel());
   el.classList.toggle('slain', mode === 'slain');
-  const [file, fw, n] = mode === 'hit' ? m.hit : m.idle;
-  el.style.backgroundImage = `url(${NA}/boss/${m.id}/${file})`;
-  el.style.backgroundSize = `${fw*n*s}px ${fw*s}px`;
+  const [file, fw, n, fh = fw] = mode === 'hit' ? m.hit : m.idle;
+  el.style.backgroundImage = `url(${NA}/boss/${id}/${file})`;
+  el.style.backgroundSize = `${fw*n*s}px ${fh*s}px`;
   el.animate([{ backgroundPosition: '0 0' }, { backgroundPosition: `${-fw*n*s}px 0` }],
     { duration: (mode === 'hit' ? 90 : 160) * n, iterations: mode === 'slain' ? 1 : Infinity, easing: `steps(${n})`, fill: 'forwards' });
   if (mode === 'hit') el.animate([{transform:'translateX(0)'},{transform:'translateX(-2px)'},{transform:'translateX(2px)'},{transform:'translateX(0)'}],
     { duration: 300, iterations: Infinity, easing: 'steps(4)', composite: 'add' });
+}
+// A small monster walking down: column 0 of its sheet, rows 0..3.
+function smallEl(id, s = 3) {
+  const el = document.createElement('div');
+  el.className = 'spr'; el.style.width = el.style.height = 16*s + 'px';
+  el.style.backgroundImage = `url(${NA}/monsters/${id}/sheet.png)`;
+  el.style.backgroundSize = `${64*s}px ${64*s}px`;
+  el.animate([{ backgroundPosition: '0 0' }, { backgroundPosition: `0 ${-64*s}px` }],
+    { duration: 4 * 160, iterations: Infinity, easing: 'steps(4)' });
+  return el;
 }
 const face = c => `background-image:url(${ch(c,'Faceset.png')})`;
 const mface = map => `background-image:url(${NA}/boss/${MONSTERS[map].id}/Faceset.png)`;
@@ -308,9 +341,9 @@ function buildArena(map, members, sts, mode) {
     setHunter(e, sts[i]);
   });
   const mw = document.createElement('div'); mw.className = 'who';
-  const fw = MONSTERS[map].idle[1]*2;
-  mw.style.left = (236 - fw/2) + 'px'; mw.style.top = (128 - fw) + 'px';
-  const me = monsterEl(map, 2); mw.appendChild(me); a.appendChild(mw);
+  const [, iw, , ih = iw] = MONSTERS[map].idle;
+  mw.style.left = (236 - iw) + 'px'; mw.style.top = (128 - ih*2) + 'px';
+  const me = monsterEl(MONSTERS[map].id, 2); mw.appendChild(me); a.appendChild(mw);
   setMonster(me, mode);
   const hp = mode === 'slain' ? 0 : mode === 'hit' ? 58 : 100;
   a.insertAdjacentHTML('beforeend', `<div class="mapname">${cap(map)} · ${MONSTERS[map].name}</div>
@@ -424,13 +457,22 @@ function renderGalleries() {
   });
   const mode = monsterMode(sts);
   const ms = document.getElementById('monsters'); ms.innerHTML = '';
-  MAPS.forEach(map => {
-    const m = MONSTERS[map];
+  Object.entries(BOSSES).forEach(([id, m]) => {
+    const map = MAPS.find(k => MAP_BOSS[k] === id);
+    const [, fw, , fh = fw] = m.idle;
     const g = document.createElement('div'); g.className = 'g card';
-    g.innerHTML = `<div class="stage" style="height:160px"></div><div class="faces"><span class="px" style="${mface(map)}"></span><span class="nm">${m.name}</span></div>
-      <div class="meta">${m.id} · ${m.idle[1]}px · lives in ${cap(map)}</div>`;
-    const e = monsterEl(map, 2); g.querySelector('.stage').appendChild(e); setMonster(e, mode);
+    g.innerHTML = `<div class="stage" style="height:200px"></div><div class="faces"><span class="px" style="background-image:url(${NA}/boss/${id}/Faceset.png)"></span><span class="nm">${m.name}</span></div>
+      <div class="meta">${id} · ${fw}×${fh}px · ${map ? 'lives in ' + cap(map) : '<span style="color:var(--accent)">not in the app yet</span>'}</div>`;
+    const e = monsterEl(id, 2); g.querySelector('.stage').appendChild(e); setMonster(e, mode);
     ms.appendChild(g);
+  });
+  const ss = document.getElementById('smalls');
+  if (!ss.childElementCount) SMALL.forEach(id => {
+    const g = document.createElement('div'); g.className = 'g card';
+    g.innerHTML = `<div class="stage" style="height:80px"></div><div class="faces"><span class="px" style="background-image:url(${NA}/monsters/${id}/Faceset.png)"></span><span class="nm">${words(id)}</span></div>
+      <div class="meta">${id} · 16×16px</div>`;
+    g.querySelector('.stage').appendChild(smallEl(id, 3));
+    ss.appendChild(g);
   });
   const as = document.getElementById('areas'); as.innerHTML = '';
   MAPS.forEach((map, k) => {

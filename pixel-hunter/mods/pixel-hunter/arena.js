@@ -19,14 +19,15 @@ const S = 2; // art px -> logical px
 export const ARENA_W = 160 * S;
 export const ARENA_H = 96 * S;
 
-// Monster strips: square frames of `size` art px, `feet` = just below the lowest opaque
+// Monster strips: frames `w` x `size` art px (`w` defaults to `size`; the samurai's are
+// 96 x 48, swords out to the sides), `feet` = just below the lowest opaque
 // row. `hit` plays while the Party Hunts (Racoon has no Hit strip: its Attack plays).
 const MONSTER_ART = {
   GiantRacoon: { file: "Idle.png", size: 60, frames: 6, feet: 55, hit: { file: "Attack.png", frames: 4, feet: 60 } },
   DemonCyclop: { file: "Idle.png", size: 50, frames: 5, feet: 43, hit: { file: "Hit.png", frames: 3, feet: 43 } },
   GiantSpirit: { file: "Idle.png", size: 50, frames: 5, feet: 48, hit: { file: "Hit.png", frames: 3, feet: 48 } },
   TenguBlue: { file: "Idle.png", size: 68, frames: 6, feet: 51, hit: { file: "Hit.png", frames: 8, feet: 60 } },
-  GiantRedSamurai: { file: "Idle.png", size: 48, frames: 12, feet: 44, hit: { file: "Hit.png", frames: 8, feet: 46 } },
+  GiantRedSamurai: { file: "Idle.png", w: 96, size: 48, frames: 6, feet: 44, hit: { file: "Hit.png", frames: 4, feet: 46 } },
   GiantFrog: { file: "Idle40x40.png", size: 40, frames: 5, feet: 33, hit: { file: "Hit.png", frames: 3, feet: 33 } },
 };
 const MONSTER_FEET = { x: 236, y: 128 }; // logical px in the arena
@@ -65,10 +66,10 @@ function frame(path, fw, fh, n, col) {
 const hunterArt = (h, file) => `${X4}/chars/${h.cls.sprite}/${file}.png`;
 
 // A strip's frames taking turns (there and back) through nested band loops, one at a time.
-function strip(path, size, n, frameMs, tag) {
+function strip(path, w, size, n, frameMs, tag) {
   const period = 2 * n * frameMs;
   return Array.from({ length: n }, (_, k) => {
-    let el = frame(path, size, size, n, k);
+    let el = frame(path, w, size, n, k);
     if (k < n - 1) el = div().id(`ph-arena-${tag}-${k}-b`).loop("opacity", before((k + 1) / n, period)).child(el);
     if (k > 0) el = div().id(`ph-arena-${tag}-${k}-a`).loop("opacity", after(k / n, period)).child(el);
     return div().absolute().left(0).top(0).child(el);
@@ -89,18 +90,19 @@ function monster(area, active) {
   const hit = area.mode === "hit" && m.hit;
   const slain = area.mode === "slain";
   const feet = hit ? m.hit.feet : m.feet;
+  const w = m.w ?? m.size;
   const box = div().id(`ph-arena-monster-${area.monster.id}`).absolute()
-    .left(MONSTER_FEET.x - (m.size * S) / 2).top(MONSTER_FEET.y - feet * S)
-    .w(m.size * S).h(m.size * S);
+    .left(MONSTER_FEET.x - (w * S) / 2).top(MONSTER_FEET.y - feet * S)
+    .w(w * S).h(m.size * S);
   let body;
   if (hit) {
     body = div().id(`ph-arena-mshake-${area.monster.id}`).absolute().left(0).top(0).size_full()
       .loop("left", { from: -SHAKE, to: SHAKE, period: SHAKE_MS, easing: "linear" })
-      .children(strip(`${dir}/${m.hit.file}`, m.size, m.hit.frames, HIT_FRAME_MS, "mh"));
+      .children(strip(`${dir}/${m.hit.file}`, w, m.size, m.hit.frames, HIT_FRAME_MS, "mh"));
   } else if (active && !slain) {
-    body = div().absolute().left(0).top(0).size_full().children(strip(`${dir}/${m.file}`, m.size, m.frames, MONSTER_FRAME_MS, "mi"));
+    body = div().absolute().left(0).top(0).size_full().children(strip(`${dir}/${m.file}`, w, m.size, m.frames, MONSTER_FRAME_MS, "mi"));
   } else {
-    body = frame(`${dir}/${m.file}`, m.size, m.size, m.frames, 0);
+    body = frame(`${dir}/${m.file}`, w, m.size, m.frames, 0);
   }
   return box.child(div().id(`ph-arena-mbody-${area.monster.id}`).absolute().left(0).size_full()
     .top(slain ? FALL : 0).opacity(slain ? SLAIN_OPACITY : 1)
