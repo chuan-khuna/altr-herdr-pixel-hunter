@@ -9,6 +9,8 @@ import { FRAME } from "./theme.js";
 
 const ART = "mods/pixel-hunter/art";
 export const monsterFace = (m) => `${ART}/boss/${m.id}/Faceset.png`;
+// The 4x copy (tools/build-art.py), for drawing a face at 2x without GPUI's smoothing.
+export const monsterFaceX4 = (m) => `${ART}/x4/boss/${m.id}/Faceset.png`;
 export const hunterFace = (cls) => `${ART}/chars/${cls.sprite}/Faceset.png`;
 
 // A 38 px faceset cropped into a framed box: `x`, `y` move the image inside the frame.
@@ -16,6 +18,15 @@ function face(path, size, x, y, c) {
   return div().relative().w(size).h(size).flex_none().overflow_hidden()
     .border(FRAME).border_color(c.border).bg(c.canvas)
     .child(image(path).absolute().left(x).top(y).w(38).h(38));
+}
+
+// The Monster's face in an Area row: the 38 px faceset at 2x (76 px, twice a Hunter
+// face), spanning both lines. The frame covers its outer art pixel all round.
+export const MONSTER_FACE = 76;
+function monsterFaceBox(m, c) {
+  return div().relative().w(MONSTER_FACE).h(MONSTER_FACE).flex_none().overflow_hidden()
+    .border(FRAME).border_color(c.border).bg(c.canvas)
+    .child(image(monsterFaceX4(m)).absolute().left(-FRAME).top(-FRAME).w(MONSTER_FACE).h(MONSTER_FACE));
 }
 
 // Pixelify Sans draws its fi/fl ligatures like an "A" ("fix" reads "Ax"): a zero-width
@@ -49,17 +60,19 @@ function areaHead(self, area, model, c) {
     .on_mouse_down("right", () => openOverlay({ mod: "menu", kind: "popup", width: 200, height: 260, props: { tab: "space", target: { id: area.id } } }))
     .child(h_flex().gap(8).items_center()
       .child(div().w(10).flex_none()) // the expand chevron's place (ticket 08)
-      .child(face(monsterFace(area.monster), 20, -9, -6, c))
-      .child(div().min_w(0).flex_shrink(1).truncate().font_semibold().text_color(c.foreground).child(plain(area.name)))
-      .child(div().flex_none().text_color(c.dim).child(`· ${area.map.name}`))
-      .child(div().flex_1())
-      .child(div().size(8).flex_none().bg(area.worst ? stateColor(c, area.worst) : c.border))
-      .when(Boolean(area.key), (el) => el.child(div().flex_none().text_size(13).text_color(c.dim).child(area.key))))
-    .child(h_flex().ml(18).mt(1).min_w(0).text_size(13).text_color(c.dim)
-      .child(div().flex_none().child(plain(area.path)))
-      .when(Boolean(area.branch), (el) => el
-        .child(div().flex_none().child(" · "))
-        .child(div().min_w(0).truncate().text_color(c.foreground).child(plain(area.branch)))));
+      .child(monsterFaceBox(area.monster, c))
+      .child(v_flex().flex_1().min_w(0).gap(2)
+        .child(h_flex().gap(8).items_center().min_w(0)
+          .child(div().min_w(0).flex_shrink(1).truncate().font_semibold().text_color(c.foreground).child(plain(area.name)))
+          .child(div().flex_none().text_color(c.dim).child(`· ${area.map.name}`))
+          .child(div().flex_1())
+          .child(div().size(8).flex_none().bg(area.worst ? stateColor(c, area.worst) : c.border))
+          .when(Boolean(area.key), (el) => el.child(div().flex_none().text_size(13).text_color(c.dim).child(area.key))))
+        .child(h_flex().min_w(0).text_size(13).text_color(c.dim)
+          .child(div().flex_none().child(plain(area.path)))
+          .when(Boolean(area.branch), (el) => el
+            .child(div().flex_none().child(" · "))
+            .child(div().min_w(0).truncate().text_color(c.foreground).child(plain(area.branch)))))));
 }
 
 function hunterRow(h, c) {
