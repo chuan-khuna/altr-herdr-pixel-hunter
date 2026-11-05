@@ -1,6 +1,6 @@
 # Pet tracking: Claude Code hooks
 
-**Status:** design, not built yet. Decided in the 2026-11-05 Pet discussion; vocabulary follows `GLOSSARY.md` (Pet, Hunter, Party, Hunting, Needs help).
+**Status:** design, not built yet. Decided in the 2026-11-05 Pet discussion and checked against a real Claude Code session in ticket 01; vocabulary follows `GLOSSARY.md` (Pet, Hunter, Party, Hunting, Needs help).
 
 A **Pet** is a Claude Code subagent (Agent tool, formerly Task) running inside a Hunter's agent. Herdr cannot see these: they run inside the Hunter's terminal and have no terminal of their own. So Claude Code has to write them down for the mod. It does that through hooks and a `subagentStatusLine` command that call one small script. Without that setup no Pet is ever shown, and nothing is guessed.
 
@@ -14,7 +14,7 @@ This extends the optional statusLine setup from ticket 06 (`statusline.mjs`, Ran
 4. [Records on disk](#records-on-disk)
 5. [Claude Code settings](#claude-code-settings)
 6. [Hunt model rules](#hunt-model-rules)
-7. [Verify before relying on it](#verify-before-relying-on-it)
+7. [Verified behaviour (ticket 01)](#verified-behaviour-ticket-01)
 
 ## What the user sees
 
@@ -46,11 +46,11 @@ The script is plain Node with no Herdr imports, at `mods/pixel-hunter/pets.mjs` 
 
 | Action | Called by | Input fields used | Effect |
 | --- | --- | --- | --- |
-| `start` | `SubagentStart` hook | `session_id`, `agent_id`, `agent_type` | Creates the Pet record. Picks an animal at random from the 10 small animals, skipping any already used by this terminal's live Pets until all 10 are taken. |
+| `start` | `SubagentStart` hook | `session_id`, `agent_id`, `agent_type` | Creates the Pet record. Picks an animal from the 10 small animals, skipping any already used by this terminal's live Pets until all 10 are taken. The first choice is seeded from `agent_id`, so a subagent that stops and is resumed (same `agent_id`, see below) usually comes back as the same animal. |
 | `stop` | `SubagentStop` hook | `agent_id` | Deletes the Pet record. A missing record is fine: SubagentStop also fires for Claude Code's internal agents. |
-| `help` | `PermissionRequest` hook | `agent_id` (only when the prompt comes from a subagent) | Sets `state: "help"` on that Pet. With no `agent_id`, the prompt is the Hunter's own and the action does nothing. |
-| `unhelp` | `PostToolUse` hook | `agent_id` | Sets `state: "hunting"` again: the Pet got past its prompt and ran a tool. |
-| `tasks` | `subagentStatusLine` command, every tick | `tasks[]`: `id`, `agentType`, `status`, `description`, `startTime` | For each `running` task, fills in `type` and `description` and refreshes `seenAt` (the heartbeat). A `completed` / `failed` / `killed` task deletes its record. |
+| `help` | `PermissionRequest` hook | `agent_id` (only when the prompt comes from a subagent) | Sets `state: "help"` and `helpAt` on that Pet. With no `agent_id`, the prompt is the Hunter's own and the action does nothing. |
+| `unhelp` | `PostToolUse` hook | `agent_id` | Sets `state: "hunting"` again: the Pet got past its prompt and ran a tool. A denied prompt fires no `PostToolUse`; the Pet then leaves at `SubagentStop`, or the next `tasks` tick clears it (below). |
+| `tasks` | `subagentStatusLine` command, every tick | `tasks[]`: `id`, `agentType`, `status`, `description`, `startTime` | For each `running` task, fills in `type` and `description` and refreshes `seenAt` (the heartbeat). A `completed` / `failed` / `killed` task deletes its record. A tick never arrives while a permission prompt is open, so a `help` Pet whose `helpAt` is more than 2 s before the tick goes back to `hunting`. |
 
 The animals are Cat, Dog, Dog2, Cub, Frog, Racoon, Monkey, Chicken, Pig and Fish (Ninja Adventure `Actor/Animals/*/Faceset.png` at 38×38, and `SpriteSheet*.png` with two 16×16 frames). Cow, Horse and Lion are too big for a Pet. The art has to be fetched from the official pack zip, because the copy under `art/` has no animals yet. Add each file to `art/CREDITS.md`.
 
@@ -85,7 +85,7 @@ Each Pet gets its own file, so parallel subagents starting at once never race on
 }
 ```
 
-`state` is `"hunting"` or `"help"`. Before the first `tasks` tick, `type` comes from the hook's `agent_type` and `description` is empty.
+`state` is `"hunting"` or `"help"`; `helpAt` (ms) is set with `"help"`. Before the first `tasks` tick, `type` comes from the hook's `agent_type` and `description` is empty.
 
 ## Claude Code settings
 
@@ -96,7 +96,7 @@ These go in the user's `~/.claude/settings.json`. The setup guide shows them, bu
   "statusLine": {
     "type": "command",
     "command": "node ~/.config/herdr-app/mods/pixel-hunter/statusline.mjs",
-    "refreshInterval": 5
+    "refreshInterval": 60
   },
   "subagentStatusLine": {
     "type": "command",
@@ -111,7 +111,7 @@ These go in the user's `~/.claude/settings.json`. The setup guide shows them, bu
 }
 ```
 
-- `refreshInterval` keeps ticks coming while the Hunter is idle and waiting on background subagents. Status-line updates are otherwise event-driven and go quiet then. Ticket 06 used 60 s. Pets need a few seconds, so the Pet heartbeat stays well under the stale limit.
+- `refreshInterval` is ticket 06's 60 s and has no effect on Pets. `subagentStatusLine` runs on its own 5 s timer whenever the agent panel shows a row, also while the Hunter is idle (measured in ticket 01).
 - `PostToolUse` fires for every tool call. `pets.mjs unhelp` returns at once when the input has no `agent_id`, so the cost is one short Node start per tool call. If that turns out to be too slow, match it to subagent tool calls only.
 - The tool used to be called `Task` (renamed `Agent` in Claude Code 2.1.63). The hooks above don't match on the tool name, so the rename doesn't matter.
 
@@ -120,20 +120,124 @@ These go in the user's `~/.claude/settings.json`. The setup guide shows them, bu
 `hunt.js` gets a new input `pets` (`{ [terminal]: record[] }`, read by a `watchFolder` adapter like `sessions.js`) and a `petStaleAfterSeconds` setting (default 120, in the same config as `staleAfterSeconds`).
 
 - **Owner.** A Pet belongs to the Hunter whose terminal matches the folder name. Nested subagents are flattened: every subagent in the session is a direct Pet of the Hunter, and no tree is drawn.
-- **Dropped.** A Pet is dropped when its Hunter's terminal is gone or is no longer an agent, when its `seenAt` is older than `petStaleAfterSeconds` (for example after a Claude Code crash where SubagentStop never fired), or when its `app` differs from the pane's app.
+- **Dropped.** A Pet is dropped when its Hunter's terminal is gone or is no longer an agent, when its `seenAt` is older than `petStaleAfterSeconds` (for example after a Claude Code crash where SubagentStop never fired). A Pet in `help` is never dropped as stale: no tick arrives while its prompt is open, however long the user takes, or when its `app` differs from the pane's app.
 - **Order.** Needs help first, then Hunting, then oldest `startedAt`. The first 2 are `shown`, and the rest count toward `more` (`[+N]`).
 - **Party.** Pets are members of the Party. The Area's worst state, the Needs help auto-expand and the HP wear all include them. The Monster is Slain only when no Hunter **or Pet** is Hunting and at least one Hunter is done.
 - **Classes.** Pets take no Class and never shift Class order.
-- **Tests.** Add `node --test` cases for: the 2 + `[+N]` cut and order, the stale drop at the exact limit, a Pet keeping the Monster alive, Pet Needs help raising the Area state, a Pet of a closed terminal ignored, and the no-duplicate animal pick (in `pets.mjs` black-box tests).
+- **Tests.** Add `node --test` cases for: the 2 + `[+N]` cut and order, the stale drop at the exact limit, a `help` Pet never dropped as stale, a Pet keeping the Monster alive, Pet Needs help raising the Area state, a Pet of a closed terminal ignored, and the no-duplicate animal pick (in `pets.mjs` black-box tests).
 
-## Verify before relying on it
+## Verified behaviour (ticket 01)
 
-These come from the Claude Code docs, but nobody has tested them here yet:
+Tested on 2026-11-05 with Claude Code 2.1.318 (Opus 5.5, 1M context) on Windows, running in Herdr terminal `t24` (`hc run --no-parent -- claude --permission-mode default`). Temporary logging commands for the four hooks, `statusLine` and `subagentStatusLine` were set in a throwaway project's `.claude/settings.local.json`; the user's `~/.claude/settings.json` was not touched. Runs: one subagent with a Bash permission prompt (approved), a subagent that spawned a nested Explore subagent and then asked for permission (left open 114 s, then approved), a subagent whose prompt was denied with Esc, and a prompt from the main session. Payloads below are trimmed (`transcript_path`, `cwd`, `scratchpad_dir`, `effort` and paths cut).
 
-- That `tasks[].id` in the `subagentStatusLine` input equals the hook `agent_id`. If it doesn't, match on `agentType` plus `startTime` instead.
-- That `PermissionRequest` input carries `agent_id` for a subagent's prompt. If it doesn't, Pet Needs help can't be told apart from Hunter Needs help, and the Pet stays Hunting.
-- That `SubagentStop` fires for background subagents.
-- That `HC_TERMINAL_ID` reaches hook processes and the `subagentStatusLine` process. The docs say hooks inherit the environment.
-- The exact `subagentStatusLine` settings shape and whether it accepts `refreshInterval`.
+### Answers
+
+| Question | Answer | Seen |
+| --- | --- | --- |
+| Does `PermissionRequest` carry `agent_id` for a subagent's prompt? | **Yes**, with `agent_type`. A main-session prompt has neither field. | verified, 4 prompts |
+| Does `tasks[].id` equal the hook `agent_id`? | **Yes**, and `tasks[].agentType` equals `agent_type`. Match on `id` alone. | verified |
+| Does `SubagentStop` fire for background subagents? | **Yes.** In 2.1.318 every Agent-tool subagent ran in the background (`tool_response.status: "async_launched"`); the model said the tool has no foreground option, so a foreground subagent could not be tested. | verified for background; foreground not observed |
+| Does `SubagentStop` fire for nested subagents? | **Yes**, for the child. The parent also gets `SubagentStop` when it ends its turn to wait for the child, then a second `SubagentStart` with the **same** `agent_id` when the child's result wakes it. | verified |
+| Does `HC_TERMINAL_ID` reach hooks and `subagentStatusLine`? | **Yes**: all 114 logged runs (every hook, `statusLine`, `subagentStatusLine`) had `HC_TERMINAL_ID=t24`, plus `HC_SCOPE` and `HC_TERMINAL_SOCKET`. | verified |
+| `subagentStatusLine` settings shape | `{ "type": "command", "command": "…" }`, as documented. `refreshInterval` was not tried on it: it is not documented there and isn't needed. | verified shape |
+| Does it tick while the Hunter is idle? | **Yes**: every 5.0 s while the agent panel shows at least one row, including while the main session sat idle. It keeps ticking a finished task as `completed` for about 25–30 s, then the row goes and the ticks stop. | verified |
+| Relation to statusLine `refreshInterval` | **None.** With `refreshInterval` 3 and then 10, `statusLine` ticked every 3 s and then 10 s, while `subagentStatusLine` stayed at 5 s both times. | verified |
+| Ticks during a permission prompt | **None at all**, from either command, while any prompt is open (114 s for a subagent prompt, 21 s for a main-session one). Ticks resume as soon as it closes. | verified |
+| Does statusLine report used and total context tokens? | **Yes**: `context_window.total_input_tokens` (used; input + cache creation + cache read) and `context_window.context_window_size` (total, `1000000` here). Both exist from the first tick; used is `0` before the first API response. | verified |
+
+Other things seen:
+
+- `SubagentStop` also fires for Claude Code's internal agents (prompt suggestions) with `agent_type: ""` and no matching `SubagentStart`. `stop` already ignores a missing record.
+- A denied prompt (Esc) fires no `PostToolUse`. The subagent then replied and stopped, so `SubagentStop` removed it 4.7 s later.
+- `PostToolUse` fires inside subagents with their `agent_id`, including the nested parent's own `Agent` call. The main session's `Agent` call has no `agent_id`.
+- `tasks[].description` stays the text the Hunter gave; `label` becomes a progress summary ("Writing probe text to probe1.txt"). Use `description`.
+- Launching `claude` with `hc run` from inside another Claude Code session passes that session's `CLAUDECODE`, `CLAUDE_CODE_SESSION_ID` and similar variables on to it, and it then started in auto mode. Unset them (or start it from the Herdr app) when testing.
+
+### What changed in the design
+
+- **Needs help is never stale.** No tick arrives while a prompt is open, so with the 120 s limit a Pet waiting on the user would be dropped. A Pet in `help` is exempt from `petStaleAfterSeconds` (see Hunt model rules).
+- **A tick clears Needs help.** Since ticks stop while any prompt is open, a `tasks` tick more than 2 s after `helpAt` means the prompt is closed: the Pet goes back to `hunting`. This covers a denied prompt and a tool that fails after approval, where no `PostToolUse` comes. `PostToolUse` stays as the fast path.
+- **Resumed Pets.** A nested parent leaves and comes back under the same `agent_id`. Seeding the animal pick from `agent_id` makes it come back as the same animal when that animal is free.
+- **No statusLine change for Pets.** The `subagentStatusLine` keeps its own 5 s heartbeat, so the statusLine `refreshInterval` stays at ticket 06's 60 s.
+
+### Captured payloads
+
+`SubagentStart`:
+
+```json
+{ "session_id": "1d775e05-…", "prompt_id": "5612294f-…", "agent_id": "a87b73ce5f399ecb8",
+  "agent_type": "general-purpose", "hook_event_name": "SubagentStart" }
+```
+
+`subagentStatusLine` stdin, 0.3 s later:
+
+```json
+{ "session_id": "1d775e05-…", "prompt_id": "5612294f-…", "columns": 194,
+  "tasks": [{ "id": "a87b73ce5f399ecb8", "type": "local_agent", "agentType": "general-purpose",
+    "status": "running", "description": "probe fg write", "label": "probe fg write",
+    "startTime": 1793884484634, "model": "claude-opus-5-5", "contextWindowSize": 1000000,
+    "tokenCount": 0, "tokenSamples": [0], "cwd": "C:\\…\\hookprobe\\proj" }] }
+```
+
+`PermissionRequest` from that subagent (a main-session one has the same shape without `agent_id` and `agent_type`):
+
+```json
+{ "session_id": "1d775e05-…", "permission_mode": "default",
+  "agent_id": "a87b73ce5f399ecb8", "agent_type": "general-purpose",
+  "hook_event_name": "PermissionRequest", "tool_name": "Bash",
+  "tool_input": { "command": "echo probe > probe1.txt", "description": "Write probe text to a file" },
+  "permission_suggestions": [{ "type": "addDirectories", "directories": ["C:\\…\\hookprobe\\proj"], "destination": "session" }] }
+```
+
+`PostToolUse` after approval:
+
+```json
+{ "agent_id": "a87b73ce5f399ecb8", "agent_type": "general-purpose", "hook_event_name": "PostToolUse",
+  "tool_name": "Bash", "tool_input": { "command": "echo probe > probe1.txt" },
+  "tool_response": { "stdout": "", "stderr": "", "interrupted": false },
+  "tool_use_id": "toolu_01Bbdy…", "duration_ms": 1408 }
+```
+
+`SubagentStop`:
+
+```json
+{ "agent_id": "a87b73ce5f399ecb8", "agent_type": "general-purpose", "hook_event_name": "SubagentStop",
+  "stop_hook_active": false, "agent_transcript_path": "…\\subagents\\agent-a87b73ce5f399ecb8.jsonl",
+  "last_assistant_message": "done",
+  "background_tasks": [{ "id": "a87b73ce5f399ecb8", "type": "subagent", "status": "running",
+    "description": "probe fg write", "agent_type": "general-purpose" }], "session_crons": [] }
+```
+
+Nested run, in order (ms timestamps):
+
+```
+1793884597047 SubagentStart      a0c676b0626300806 general-purpose   (parent)
+1793884600559 SubagentStart      ac4a9a06bc885e83a Explore           (child)
+1793884603699 SubagentStop       a0c676b0626300806                   parent ends its turn
+1793884605560 tasks              parent:completed, child:running
+1793884610194 SubagentStop       ac4a9a06bc885e83a                   child done
+1793884610383 SubagentStart      a0c676b0626300806 general-purpose   parent resumed, same id
+1793884613983 PermissionRequest  a0c676b0626300806 Bash
+              (no statusLine or subagentStatusLine tick for 114 s)
+1793884728458 PostToolUse        a0c676b0626300806 Bash              approved
+1793884733503 SubagentStop       a0c676b0626300806
+```
+
+statusLine `context_window` after a few turns:
+
+```json
+{ "total_input_tokens": 68586, "total_output_tokens": 86, "context_window_size": 1000000,
+  "current_usage": { "input_tokens": 4, "output_tokens": 86,
+    "cache_creation_input_tokens": 42, "cache_read_input_tokens": 68540 },
+  "used_percentage": 7, "remaining_percentage": 93 }
+```
+
+Before the first response the same object read `total_input_tokens: 0`, `context_window_size: 1000000`, and `null` for `current_usage`, `used_percentage` and `remaining_percentage`.
+
+### Not verified
+
+- A foreground (blocking) subagent: none could be started in 2.1.318.
+- A tool that fails after approval (would fire `PostToolUseFailure`, not `PostToolUse`). The tick rule above covers it either way.
+- Whether `subagentStatusLine` accepts a `refreshInterval` of its own.
 
 Sources: Claude Code docs, [hooks](https://code.claude.com/docs/en/hooks.md), [subagents](https://code.claude.com/docs/en/sub-agents.md), [status line](https://code.claude.com/docs/en/statusline.md).

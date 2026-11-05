@@ -118,12 +118,12 @@ The Area row becomes three lines (space name, path, branch) beside the Monster's
   - `stop` (SubagentStop): deletes the Pet record.
   - `help` (PermissionRequest that carries an `agent_id`): marks the Pet Needs help.
   - `unhelp` (PostToolUse that carries an `agent_id`): marks the Pet Hunting again.
-  - `tasks` (the `subagentStatusLine` command): fills in type and description, refreshes the heartbeat, and drops completed, failed or killed tasks.
+  - `tasks` (the `subagentStatusLine` command): fills in type and description, refreshes the heartbeat, and drops completed, failed or killed tasks. Because no tick arrives while a permission prompt is open, a tick more than 2 s after a Pet's `helpAt` also marks it Hunting again (covers a denied prompt, which fires no PostToolUse).
 
   It reads the hook JSON from stdin, always exits 0, and prints nothing.
 - **Shared rules with the statusLine script.** Identity comes from `HC_TERMINAL_ID` and nothing is written without a plain id. Control and bidi characters are stripped and text is capped at 80 characters. Writes go to a temp file and then rename, with an in-place fallback on Windows. There is an env override for the folder.
-- **Records.** One JSON file per Pet, under the Herdr app data folder: `pixel-hunter/pets/<terminal>/<agent id>`. Separate files mean Pets starting in parallel never race. Shape: `{ v, app, terminal, session, agent, type, description, animal, state: "hunting" | "help", startedAt, seenAt }`. `tasks` rewrites a record only when it changes, or when `seenAt` is 30 s old.
-- **Animal pick.** It happens in the script at `start`. The script reads its sibling records and picks at random among animals not used by this terminal's live Pets. When all 10 are used, it picks from all 10.
+- **Records.** One JSON file per Pet, under the Herdr app data folder: `pixel-hunter/pets/<terminal>/<agent id>`. Separate files mean Pets starting in parallel never race. Shape: `{ v, app, terminal, session, agent, type, description, animal, state: "hunting" | "help", helpAt, startedAt, seenAt }`. `tasks` rewrites a record only when it changes, or when `seenAt` is 30 s old.
+- **Animal pick.** It happens in the script at `start`. The script reads its sibling records and picks among animals not used by this terminal's live Pets, with the first choice seeded from the `agent_id`, so a resumed subagent (same `agent_id`) usually gets its animal back. When all 10 are used, it picks from all 10.
 - **Pet adapter.** A Herdr-side reader, like the existing sessions reader, watches the pets folder with `watchFolder` and passes `{ [terminal]: record[] }` to the world. It uses no new timer, except that the sidebar's existing single wake one-shot also arms for the earliest Pet stale time.
 - **Hunt model input.**
   - `hunt()` gains `pets` and a `random` function (defaults to `Math.random`), used only for Respawn picks.
@@ -132,7 +132,7 @@ The Area row becomes three lines (space name, path, branch) beside the Monster's
   - Each Hunter gains `pets: { shown: Pet[≤2], more: number, all: Pet[] }`, ordered Needs help, then Hunting, then `startedAt`. Each Pet carries `{ agent, type, description, animal, state }`.
   - Each Hunter gains `name` (the tab name, falling back to the Class name), `programLabel` (null for Claude Code), and `tokens: { used, size, text }`, where `text` is like `128k/200k` or `410k/1M`, and null without data.
   - Each Area gains `monster` (the current Monster id).
-- **Pet filtering.** Pets are dropped when the owning terminal isn't a live agent pane, when `seenAt` is older than the limit, or when the record's `app` differs from the pane's app.
+- **Pet filtering.** Pets are dropped when the owning terminal isn't a live agent pane, when `seenAt` is older than the limit (never while the Pet Needs help: no heartbeat arrives during a prompt), or when the record's `app` differs from the pane's app.
 - **Party rules.** Pet states join the Area's worst state, the Needs help auto-expand, HP wear (any member Hunting) and Slain (no member Hunting and at least one Hunter done). `arenaPick` stays Hunter-only. Pets ride along with their Hunter.
 - **Token data.** It comes from the statusLine script. The session record gains `used` and `size` (context tokens) when Claude Code reports them, and is never computed from percentages. The record version bumps if needed. Older records without tokens show the bar only.
 - **Respawn.**
@@ -152,14 +152,14 @@ The Area row becomes three lines (space name, path, branch) beside the Monster's
 - **Art.**
   - The 10 small-animal facesets and sprite sheets get copied pixel-exact from the official Ninja Adventure zip (CC0) and added to the art credits.
   - Cow, Horse and Lion are excluded.
-- **Setup docs.** The README gets a Pets section with the settings block (hooks plus `subagentStatusLine`, and a statusLine `refreshInterval` of a few seconds). RECIPE.md **Watch out** notes the setup and the 2-minute limit.
+- **Setup docs.** The README gets a Pets section with the settings block (hooks plus `subagentStatusLine`; the statusLine `refreshInterval` stays at 60 s, since `subagentStatusLine` ticks every 5 s on its own). RECIPE.md **Watch out** notes the setup and the 2-minute limit.
 
 ## Testing Decisions
 
 - Good tests check external behaviour only: `hunt()` inputs → its output, and the hook script's stdin and env → files on disk. They don't check internal helpers or rendering code.
 - **Seam 1: `hunt()`** (prior art: the existing hunt model tests). New cases:
   - The 2 + `[+N]` cut and ordering, including a Needs help Pet beyond the first two moving up.
-  - Stale Pets dropped at exactly the limit and with a custom limit.
+  - Stale Pets dropped at exactly the limit and with a custom limit, and a Needs help Pet never dropped as stale.
   - Pets of a closed or non-agent terminal ignored.
   - A Pet with another app ignored.
   - A Hunting Pet keeps HP wearing and prevents Slain while its Hunter is Cleared.
@@ -196,11 +196,13 @@ The Area row becomes three lines (space name, path, branch) beside the Monster's
 
 ## Further Notes
 
-- These Claude Code facts come from the docs and haven't been tested here yet. Verify them first, because some decisions depend on them:
-  - **`tasks[].id` and `agent_id`.** Does `tasks[].id` in the `subagentStatusLine` input equal the hook `agent_id`? If not, match on agent type plus start time.
-  - **`PermissionRequest` and `agent_id`.** Does `PermissionRequest` carry `agent_id` for a subagent's prompt? If not, Pet Needs help can't be detected: drop stories 11, 17 and 25 and say so in the README.
-  - **Background subagents.** Does `SubagentStop` fire for background subagents? The stale limit covers it if not.
-  - **Environment.** Does `HC_TERMINAL_ID` reach hook and `subagentStatusLine` processes?
-  - **Settings shape.** What is the exact `subagentStatusLine` settings shape?
-- Ticket 06 set the statusLine `refreshInterval` to 60 s. Pets need a few seconds so the heartbeat stays well inside the 2-minute limit. The README changes accordingly.
+- Ticket 01 checked the Claude Code facts in a real session (Claude Code 2.1.318 in a Herdr terminal). Payloads and details are in `docs/documents/pet-tracking-hooks.md`, "Verified behaviour (ticket 01)". In short:
+  - **`tasks[].id` and `agent_id`.** Equal, and `tasks[].agentType` equals `agent_type`. Match on the id.
+  - **`PermissionRequest` and `agent_id`.** A subagent's prompt carries `agent_id` and `agent_type`; the Hunter's own has neither. Stories 11, 17 and 25 stay.
+  - **Background and nested subagents.** `SubagentStop` fires for both. A nested parent stops while it waits for its child and starts again with the same `agent_id`, so its Pet leaves and comes back (with the same animal when it is free).
+  - **Environment.** `HC_TERMINAL_ID` reaches every hook and both status-line commands.
+  - **Settings shape.** `"subagentStatusLine": { "type": "command", "command": "…" }`. It ticks every 5 s while the agent panel shows a row, also while the Hunter is idle, independent of the statusLine `refreshInterval`.
+  - **Fallback that applies.** Neither status-line command ticks while a permission prompt is open, however long. A Needs help Pet is therefore never dropped as stale, and the next tick after the prompt closes clears Needs help.
+  - **Tokens (ticket 04).** The statusLine input has `context_window.total_input_tokens` (used) and `context_window.context_window_size` (total).
+- Ticket 06 set the statusLine `refreshInterval` to 60 s. That stays: Pets don't depend on it.
 - The sprite sheets for most animals have only two 16×16 frames, so Pet animation is a two-frame loop with no attack pose.

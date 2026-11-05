@@ -8,7 +8,9 @@
 
 With no data the row shows `STA —` and no number. A Hunter that Needs help keeps its peach frame.
 
-**Blocked by:** None (can start immediately). If ticket 01 lands first, use its finding for the token fields.
+**Blocked by:** None (can start immediately).
+
+**Token fields (verified in ticket 01):** used = `context_window.total_input_tokens` (input + cache creation + cache read, from the last API response), total = `context_window.context_window_size` (`200000`, or `1000000` for 1M models). Both are present from the first tick; used is `0` before the first response, while `current_usage`, `used_percentage` and `remaining_percentage` are `null` then. Treat used `0` as no data yet.
 
 **Status:** ready-for-agent
 
