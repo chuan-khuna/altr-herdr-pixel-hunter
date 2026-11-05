@@ -16,9 +16,11 @@ import { colors, FONT_UI, FRAME } from "./theme.js";
 import { world } from "./world.js";
 import { smallFace, gradeBadge, stateColor, stateText, plain, SMALL_FACE } from "./areas.js";
 import { startSessions } from "./sessions.js";
+import { startPins } from "./pins.js";
 
 export function paneInit(self, cx) {
   self.hovered = false;
+  startPins(self, cx);
   startSessions(self, cx); // Rank comes from the statusLine records, like the sidebar's
 }
 

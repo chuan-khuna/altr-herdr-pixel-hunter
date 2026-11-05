@@ -4,7 +4,8 @@
 //   hunt(snapshot) -> { areas, state }
 //
 // snapshot:
-//   spaces  [{ id, name, named, folder, branch, active, tabs: [{ id, index }] }] in Herdr's order
+//   spaces  [{ id, name, named, folder, branch, active, tabs: [{ id, index, name, named }] }] in
+//           Herdr's order; a tab's name counts for a Class pin only when someone named it
 //   panes   [{ pane, terminal, tab, status, program, cwd, branch, focused }]
 //           status: "working" | "blocked" | "done" | "idle" | null (null: not an agent)
 //           program: the program's name for people ("Claude Code"), the Rank label with no record
@@ -21,6 +22,9 @@
 //           not known yet), written at `at` ms. Bad fields are ignored; nothing is estimated.
 //   ranks   optional { grades: { [word]: grade }, staleAfterSeconds } (rank.json); missing or
 //           bad parts fall back to RANKS
+//   pins    optional { tabs: { [tabName]: className } } (classes.json): every Hunter in a tab with
+//           that name has that Class, whatever it had before. Names match trimmed and ignoring
+//           case; an unknown Class or a bad entry is ignored. See classPins()
 //   now     ms, passed in, never read from a clock here, so HP wear and staleness are deterministic
 //
 // Output:
@@ -62,7 +66,7 @@
 //           null (a shell, a mod pane); path its own folder for display (PANE_PATH_MAX), null
 //           without one; branch its own git branch, null outside git; frame "help" (peach)
 //           when its Hunter Needs help, else "focus" (mint) when it has the keyboard, else null
-//   state   the next persisted state: { ...state, classes: { [terminal]: "Knight" },
+//   state   the next persisted state: { ...state, classes: { [terminal]: "Knight" } (pins included),
 //           monsters: { [spaceId]: { hp, since, slain } }, collapsed: { [spaceId]: true | false } }
 //           collapsed holds only choices made by hand (true: collapsed, false: expanded);
 //           toggleArea() makes one. Records of closed spaces go, as for monsters.
@@ -225,12 +229,33 @@ function spacePanes(space, panes) {
     .map(({ p }) => p);
 }
 
+/** The Class pins from classes.json's parsed contents: a Map of lower-cased tab name to Class
+ *  name. A tab name is trimmed and matched ignoring case, a Class name too ("mage" is Mage);
+ *  an empty name, an unknown Class or a broken file pins nothing. */
+export function classPins(cfg) {
+  const obj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const pins = new Map();
+  if (!obj(cfg) || !obj(cfg.tabs)) return pins;
+  const byLower = new Map(CLASSES.map((c) => [c.name.toLowerCase(), c.name]));
+  for (const [tab, cls] of Object.entries(cfg.tabs)) {
+    const key = tab.trim().toLowerCase();
+    const name = typeof cls === "string" ? byLower.get(cls.trim().toLowerCase()) : undefined;
+    if (key && name && !pins.has(key)) pins.set(key, name);
+  }
+  return pins;
+}
+
 // Gives each new Hunter the Class used least among the living ones, ties by Class order,
 // so Classes come in order of first appearance and cycle after six. Known Hunters keep theirs.
-function assignClasses(order, old) {
+// A pinned Hunter (`pinned`: { [terminal]: Class }) always has its pin, and the pin counts as
+// a use, so the others still spread over the Classes left.
+function assignClasses(order, old, pinned = {}) {
   const known = new Set(CLASSES.map((c) => c.name));
   const classes = {};
-  for (const t of order) if (known.has(old[t])) classes[t] = old[t];
+  for (const t of order) {
+    if (known.has(pinned[t])) classes[t] = pinned[t];
+    else if (known.has(old[t])) classes[t] = old[t];
+  }
   const uses = Object.fromEntries(CLASSES.map((c) => [c.name, 0]));
   for (const name of Object.values(classes)) uses[name]++;
   for (const t of order) {
@@ -332,7 +357,7 @@ function monsterView(r, now) {
   };
 }
 
-export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}, sessions = {}, ranks, now = 0 } = {}) {
+export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}, sessions = {}, ranks, pins, now = 0 } = {}) {
   now = Number.isFinite(now) ? now : 0;
   spaces = (spaces ?? []).filter((s) => s && s.id != null);
   panes = (panes ?? []).filter(Boolean);
@@ -343,7 +368,18 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
   const perSpace = spaces.map((s) => spacePanes(s, panes));
   const agentsOf = (ps) => ps.filter((p) => p.terminal && huntState(p.status));
   const order = perSpace.flatMap(agentsOf).map((p) => p.terminal);
-  const classes = assignClasses(order, state.classes ?? {});
+  const pinOf = classPins(pins);
+  const pinned = {};
+  spaces.forEach((s, i) => {
+    const tabNames = new Map((s.tabs ?? []).filter((t) => t && t.named && typeof t.name === "string")
+      .map((t) => [t.id, t.name.trim().toLowerCase()]));
+    for (const p of agentsOf(perSpace[i])) {
+      const pin = pinOf.get(tabNames.get(p.tab));
+      if (pin) pinned[p.terminal] = pin;
+    }
+  });
+  const oldClasses = state.classes && typeof state.classes === "object" ? state.classes : {};
+  const classes = assignClasses(order, oldClasses, pinned);
   const byName = Object.fromEntries(CLASSES.map((c) => [c.name, c]));
   const oldMonsters = state.monsters && typeof state.monsters === "object" ? state.monsters : {};
   // Records of closed spaces go, but not while Herdr lists no spaces at all (still starting).

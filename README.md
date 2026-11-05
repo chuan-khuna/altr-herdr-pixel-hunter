@@ -67,3 +67,32 @@ other model shows `?`. Saving the file updates the sidebar at once.
 
 `staleAfterSeconds` is the freshness limit. A broken file falls back to these
 defaults.
+
+## Pin a Class to a tab
+
+Hunters take Classes (Knight, Mage, Archer, Rogue, Monk, Samurai) in order of
+first appearance across all spaces, and keep theirs while they live. To give a
+tab's Hunters a fixed Class, name the tab and pin it in
+`~/.config/herdr-app/mods/pixel-hunter/classes.json`:
+
+```json
+{
+  "tabs": { "api": "Mage", "web": "Archer" }
+}
+```
+
+- Every Hunter in a tab called `api` (in any space) is a Mage, also after the
+  tab is closed and opened again, or moved. A pin wins over the Class the
+  Hunter had before.
+- Tab and Class names match ignoring case and spaces around them. Only tabs
+  someone named count: an unnamed tab is called by its number, which changes
+  when tabs move.
+- Hunters in other tabs still take Classes in order, using the Classes no
+  pinned Hunter has first.
+- An unknown Class name (`"Paladin"`) or a broken file is ignored, and those
+  tabs get Classes in order. Removing a pin keeps the Hunter's current Class
+  until it closes.
+- Saving the file updates the sidebar, tabs and pane headers at once, with no
+  restart.
+
+The shipped file pins nothing: `{ "tabs": {} }`.

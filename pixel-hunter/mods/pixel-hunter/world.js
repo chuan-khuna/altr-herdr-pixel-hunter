@@ -18,7 +18,8 @@ function spaceKeys() {
   return out;
 }
 
-// `self`: the role's View, holding the session records and grade table (sessions.js).
+// `self`: the role's View, holding the session records and grade table (sessions.js) and the
+// Class pins (pins.js).
 // The chevron: remember the opposite of what `area` (from world()) shows now, for its space.
 // Not in demo mode (the snapshot is never persisted).
 export function toggleExpanded(area) {
@@ -29,14 +30,14 @@ export function toggleExpanded(area) {
 }
 
 export function world(self, now = Date.now()) {
-  if (props()?.demo) return hunt({ ...DEMO, sessions: demoSessions(now), ranks: self?.ranks ?? null, now }); // a screenshot snapshot, never persisted
+  if (props()?.demo) return hunt({ ...DEMO, sessions: demoSessions(now), ranks: self?.ranks ?? null, pins: self?.pins ?? null, now }); // a screenshot snapshot, never persisted
   const state = shared(STATE_KEY) ?? {};
   // herdr-core's own status per terminal: it keeps "done" after Herdr shows the agent as seen
   const report = new Map((terminals() ?? []).filter(Boolean).map((t) => [t.address, t.status]));
   const out = hunt({
     spaces: spaces().map((s) => ({
       id: s.id, name: s.name, named: s.named, folder: s.folder, branch: s.branch, active: s.active,
-      tabs: (s.tabs ?? []).map((t) => ({ id: t.id, index: t.index })),
+      tabs: (s.tabs ?? []).map((t) => ({ id: t.id, index: t.index, name: t.name, named: t.named })),
     })),
     panes: panes().map((p) => ({
       pane: p.pane, terminal: p.terminal, tab: p.tab, status: p.status,
@@ -48,8 +49,11 @@ export function world(self, now = Date.now()) {
     state,
     sessions: self?.sessions ?? {},
     ranks: self?.ranks ?? null,
+    pins: self?.pins ?? null,
     now,
   });
-  if (JSON.stringify(out.state) !== JSON.stringify(state)) setShared(STATE_KEY, out.state);
+  // Until classes.json is read (pins.js), a pinned Hunter would get a Class by order: show it
+  // with what it had, but don't write that down, or the copies would fight over it.
+  if (self?.pins !== undefined && JSON.stringify(out.state) !== JSON.stringify(state)) setShared(STATE_KEY, out.state);
   return out;
 }

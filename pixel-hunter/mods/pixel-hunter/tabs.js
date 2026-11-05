@@ -10,6 +10,7 @@ import { h_flex } from "gpui-base";
 import { spaces, run, openOverlay, window, shared, layout, settings } from "herdr";
 import { colors, FONT_UI, FRAME } from "./theme.js";
 import { world } from "./world.js";
+import { startPins } from "./pins.js";
 import { smallFace, stateColor, plain, SMALL_FACE } from "./areas.js";
 
 const ICONS = "mods/pixel-hunter/icons";
@@ -25,7 +26,8 @@ function find(node, id) {
   return null;
 }
 
-export function tabsInit(self) {
+export function tabsInit(self, cx) {
+  startPins(self, cx);
   self.pressed = null;
   try { self.panels = JSON.parse(localStorage.getItem("panels") ?? "{}") ?? {}; } catch { self.panels = {}; }
 }

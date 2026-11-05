@@ -12,10 +12,12 @@ import { world } from "./world.js";
 import { arena } from "./arena.js";
 import { areaList } from "./areas.js";
 import { startSessions } from "./sessions.js";
+import { startPins } from "./pins.js";
 
 export const HP_TICK_MS = 10 * 1000;
 
 export function sidebarInit(self, cx, p) {
+  startPins(self, cx);
   if (!p?.demo) startSessions(self, cx); // the demo carries its own records
 }
 

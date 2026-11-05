@@ -1,7 +1,7 @@
 // The hunt model, snapshot in and view model out. Run: node --test mods/pixel-hunter/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS, paneFrame, toggleArea } from "../hunt.js";
+import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS, paneFrame, toggleArea, classPins } from "../hunt.js";
 import { readFileSync } from "node:fs";
 
 const HOME = "/Users/me";
@@ -535,4 +535,55 @@ test("choices of closed spaces are dropped; bad saved choices are ignored", () =
   assert.equal(areas[0].expanded, false);
   assert.deepEqual(next.collapsed, {});
   assert.deepEqual(hunt({ spaces: [a], home: HOME, state: { collapsed: "bad" } }).state.collapsed, {});
+});
+
+// Class pins (classes.json): a named tab always gives its Hunters the pinned Class.
+const tabbed = (id, tabs) => space({ id, tabs: tabs.map(([tid, name], i) => ({ id: tid, index: i + 1, name: name ?? String(i + 1), named: name != null })) });
+
+test("a pinned tab gives its Hunter that Class, also when it comes back as a new terminal", () => {
+  const a = tabbed("pin1", [["t-web", "web"], ["t-api", "api"]]);
+  const pins = { tabs: { api: "Mage" } };
+  const first = hunt({ spaces: [a], panes: [agent(a, "w1", { tab: "t-web" }), agent(a, "x1", { tab: "t-api" })], home: HOME, pins });
+  assert.deepEqual(first.areas[0].hunters.map((h) => [h.terminal, h.cls.name]), [["w1", "Knight"], ["x1", "Mage"]]);
+  assert.equal(first.state.classes.x1, "Mage");
+
+  // The api tab moves first, its agent restarts (a new terminal) and the web tab closes.
+  const moved = { ...a, tabs: [{ id: "t-api", index: 1, name: "api", named: true }] };
+  const next = hunt({ spaces: [moved], panes: [agent(a, "x2", { tab: "t-api" })], home: HOME, pins, state: first.state });
+  assert.deepEqual(next.areas[0].hunters.map((h) => [h.terminal, h.cls.name]), [["x2", "Mage"]]);
+
+  // A pin wins over a Class the Hunter had before; names match trimmed and ignoring case.
+  const old = { classes: { x1: "Knight" } };
+  const again = hunt({ spaces: [a], panes: [agent(a, "x1", { tab: "t-api" })], home: HOME, pins: { tabs: { " API ": "mage" } }, state: old });
+  assert.equal(again.areas[0].hunters[0].cls.name, "Mage");
+});
+
+test("unpinned Hunters still take Classes in order, around the pinned ones", () => {
+  const a = tabbed("pin2", [["t1", null], ["t2", "api"], ["t3", "docs"], ["t4", null]]);
+  const panes = [agent(a, "h1", { tab: "t1" }), agent(a, "h2", { tab: "t2" }), agent(a, "h3", { tab: "t3" }), agent(a, "h4", { tab: "t4" })];
+  const { areas } = hunt({ spaces: [a], panes, home: HOME, pins: { tabs: { api: "Knight", docs: "Mage" } } });
+  assert.deepEqual(areas[0].hunters.map((h) => h.cls.name), ["Archer", "Knight", "Mage", "Rogue"]);
+
+  // A tab nobody named doesn't match by its position: "1" pins nothing.
+  const pos = hunt({ spaces: [a], panes, home: HOME, pins: { tabs: { 1: "Samurai" } } });
+  assert.deepEqual(pos.areas[0].hunters.map((h) => h.cls.name), ["Knight", "Mage", "Archer", "Rogue"]);
+});
+
+test("an unknown Class name or a broken config is ignored and the sidebar still draws", () => {
+  const a = tabbed("pin3", [["t1", "api"], ["t2", "web"]]);
+  const panes = [agent(a, "k1", { tab: "t1" }), agent(a, "k2", { tab: "t2" })];
+  const plain = ["Knight", "Mage"];
+  for (const pins of [{ tabs: { api: "Paladin", web: 3 } }, { tabs: ["Mage"] }, { tabs: null }, "Mage", null, undefined, { tabs: { "": "Mage" } }]) {
+    const { areas } = hunt({ spaces: [a], panes, home: HOME, pins });
+    assert.deepEqual(areas[0].hunters.map((h) => h.cls.name), plain, JSON.stringify(pins));
+  }
+  // A good entry next to a bad one still works.
+  const mixed = hunt({ spaces: [a], panes, home: HOME, pins: { tabs: { api: "Paladin", web: "Samurai" } } });
+  assert.deepEqual(mixed.areas[0].hunters.map((h) => h.cls.name), ["Knight", "Samurai"]);
+  assert.deepEqual([...classPins({ tabs: { Api: "monk", api: "Knight", x: "Druid" } })], [["api", "Monk"]]);
+});
+
+test("the shipped classes.json parses and pins nothing by default", () => {
+  const cfg = JSON.parse(readFileSync(new URL("../classes.json", import.meta.url), "utf8"));
+  assert.equal(classPins(cfg).size, 0);
 });
