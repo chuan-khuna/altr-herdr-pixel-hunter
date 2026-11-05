@@ -1,7 +1,7 @@
 // The hunt model, snapshot in and view model out. Run: node --test mods/pixel-hunter/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS, paneFrame, toggleArea, classPins } from "../hunt.js";
+import { hunt, displayPath, folderName, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS, paneFrame, toggleArea, classPins } from "../hunt.js";
 import { readFileSync } from "node:fs";
 
 const HOME = "/Users/me";
@@ -55,6 +55,44 @@ test("path shows ~ for home, is shortened when long, and has no branch outside g
 
   const e = space({ folder: "" });
   assert.equal(hunt({ spaces: [e], home: HOME }).areas[0].path, "~");
+});
+
+test("Windows paths: either separator, drive letters, UNC shares, home matched ignoring case", () => {
+  const WIN = "C:\\Users\\chuan";
+  assert.equal(displayPath(WIN, WIN), "~");
+  assert.equal(displayPath("c:\\users\\Chuan\\", WIN), "~");
+  assert.equal(displayPath("C:\\Users\\chuan\\code\\foo", WIN), "~\\code\\foo");
+  assert.equal(displayPath("C:/Users/chuan/code/foo", WIN), "~/code/foo");
+  assert.equal(displayPath("C:\\Users\\chuanx\\code", WIN), "C:\\Users\\chuanx\\code");
+  assert.equal(displayPath("D:\\code\\x", WIN), "D:\\code\\x");
+  assert.equal(displayPath("D:\\", WIN), "D:\\");
+  assert.equal(displayPath("D:", WIN), "D:\\");
+
+  const long = displayPath("C:\\Users\\chuan\\Documents\\code\\personal\\herdr-monster-hunter", WIN);
+  assert.equal(long, "~\\…\\herdr-monster-hunter");
+  assert.ok(long.length <= 30);
+  assert.equal(displayPath("D:\\work\\one\\two\\three\\four\\five", WIN, 22), "D:\\…\\three\\four\\five");
+  assert.equal(displayPath("\\\\server\\share\\team\\projects\\deep\\app", WIN, 30), "\\\\server\\share\\…\\deep\\app");
+  assert.equal(displayPath("D:\\a-really-long-folder-name-that-never-fits", WIN), "…\\a-really-long-folder-name-that-never-fits");
+  assert.ok(!displayPath("C:\\Users\\chuan\\code\\altr-herdr-pixel-hunter", WIN).includes("undefined"));
+
+  assert.equal(folderName("C:\\Users\\chuan\\code\\foo", WIN), "foo");
+  assert.equal(folderName("c:\\USERS\\chuan", WIN), "~");
+  assert.equal(folderName("D:\\code\\x\\", WIN), "x");
+  assert.equal(folderName("D:\\", WIN), "D:\\");
+  assert.equal(folderName("\\\\server\\share", WIN), "share");
+
+  const s = space({ name: "" });
+  const { areas } = hunt({ spaces: [s], panes: [shell(s, { cwd: "C:\\Users\\chuan\\code\\shop-api" })], home: WIN });
+  assert.equal(areas[0].name, "shop-api");
+  assert.equal(areas[0].path, "~\\code\\shop-api");
+});
+
+test("POSIX paths keep / only and match home by case", () => {
+  assert.equal(displayPath("/users/ME/code", HOME), "/users/ME/code");
+  assert.equal(displayPath(`${HOME}/a\\b`, HOME), "~/a\\b");
+  assert.equal(folderName(`${HOME}/code/shop-api`, HOME), "shop-api");
+  assert.equal(folderName(HOME, HOME), "~");
 });
 
 test("the Area path and branch come from its first terminal, in tab order", () => {

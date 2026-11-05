@@ -123,31 +123,61 @@ export function mapFor(index) {
 
 export const PATH_MAX = 30;
 
+// A Windows path: a drive ("C:\", "C:/", "C:") or a UNC share ("\\server\share"). Such paths, or
+// any path when home is one, split on both "\" and "/", match home ignoring case, and keep the
+// separator the path itself uses ("C:\Users\me\code" shows as "~\code"). Other paths are POSIX:
+// "/" only, case-sensitive, as before.
+const WIN_PATH = /^(?:[a-zA-Z]:(?:[\\/]|$)|[\\/]{2}[^\\/])/;
+
+function pathStyle(path, home) {
+  const win = WIN_PATH.test(path) || WIN_PATH.test(home || "");
+  if (!win) return { win, sep: "/", split: "/" };
+  return { win, sep: path.match(/[\\/]/)?.[0] ?? "\\", split: /[\\/]/ };
+}
+
 /** A folder for display: home as "~", and a long path cut to "head/…/tail" within `max` chars. */
 export function displayPath(path, home, max = PATH_MAX) {
   if (!path) return "~";
-  let p = path.length > 1 ? path.replace(/\/+$/, "") : path;
-  const h = home ? home.replace(/\/+$/, "") : "";
-  if (h && (p === h || p.startsWith(h + "/"))) p = "~" + p.slice(h.length);
+  const { win, sep, split } = pathStyle(path, home);
+  let p, h;
+  if (win) {
+    p = path.replace(/[\\/]+$/, "");
+    if (/^[a-zA-Z]:$/.test(p)) p += sep; // a drive root keeps its separator: "C:\"
+    h = home ? home.replace(/[\\/]+$/, "") : "";
+  } else {
+    p = path.length > 1 ? path.replace(/\/+$/, "") : path;
+    h = home ? home.replace(/\/+$/, "") : "";
+  }
+  const key = win ? (s) => s.replace(/\\/g, "/").toLowerCase() : (s) => s;
+  if (h && (key(p) === key(h) || key(p).startsWith(key(h) + "/"))) p = "~" + p.slice(h.length);
   if (p.length <= max) return p;
-  const parts = p.split("/");
-  const head = parts[0] === "" ? "/" + parts[1] : parts[0];
-  const rest = parts.slice(parts[0] === "" ? 2 : 1);
+  const parts = p.split(split);
+  let head, rest;
+  if (win && parts[0] === "" && parts[1] === "") {
+    head = sep + sep + parts[2] + sep + parts[3]; // UNC: "\\server\share"
+    rest = parts.slice(4);
+  } else {
+    head = parts[0] === "" ? sep + parts[1] : parts[0];
+    rest = parts.slice(parts[0] === "" ? 2 : 1);
+  }
+  if (rest.length === 0) return p; // nothing after the root to cut
   let tail = rest[rest.length - 1];
   for (let i = rest.length - 2; i >= 0; i--) {
-    const next = rest[i] + "/" + tail;
-    if ((head + "/…/" + next).length > max) break;
+    const next = rest[i] + sep + tail;
+    if ((head + sep + "…" + sep + next).length > max) break;
     tail = next;
   }
-  const out = head + "/…/" + tail;
-  return out.length <= max ? out : "…/" + rest[rest.length - 1];
+  const out = head + sep + "…" + sep + tail;
+  return out.length <= max ? out : "…" + sep + rest[rest.length - 1];
 }
 
 /** The last folder of a path, "~" at home: Herdr's own name for an unnamed space without a repo. */
 export function folderName(path, home) {
   const shown = displayPath(path, home, Infinity);
   if (shown === "~") return "~";
-  return shown.split("/").filter(Boolean).pop() ?? "~";
+  const { win, split } = pathStyle(path || "", home);
+  if (win && /^[a-zA-Z]:[\\/]$/.test(shown)) return shown; // a drive root: "C:\"
+  return shown.split(split).filter(Boolean).pop() ?? "~";
 }
 
 /** A key like "ctrl-1" as people read it: "⌃1". */
