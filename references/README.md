@@ -15,6 +15,9 @@ git clone --depth 1 https://github.com/Jiqize/herdr-kaiju.git
 
 ## Assets
 
+- https://craftpix.net/freebies/
+- https://itch.io/game-assets/free
+
 In use:
 
 - [Ninja Adventure Asset Pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack)
@@ -28,3 +31,5 @@ Candidates:
 - https://maevedevs.itch.io/farm-rpg
 - https://pixelfrog-assets.itch.io/tiny-swords
 - https://toffeecraft.itch.io/cat-retro
+- https://toffeecraft.itch.io/cat-pack
+- https://toffeecraft.itch.io/cat-room
