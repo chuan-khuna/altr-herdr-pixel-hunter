@@ -1,8 +1,8 @@
-# Monster Hunter
+# Pixel Hunter
 
 TODO: one paragraph of what the person sees when this layout is on.
 
-![Monster Hunter](preview.png)
+![Pixel Hunter](preview.png)
 
 ## What you see
 
@@ -32,4 +32,4 @@ the setup.
 TODO: checks that prove a build works, each one something the build really does.
 
 - `herdr-app check mods/<mod>` passes for every mod.
-- `layout.switch monster-hunter` shows the layout.
+- `layout.switch pixel-hunter` shows the layout.

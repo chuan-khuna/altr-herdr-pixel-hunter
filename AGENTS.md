@@ -1,34 +1,36 @@
 # herdr-monster-hunter
 
-This repo shares one Herdr layout, **monster-hunter**, so it shows up at
-herdr.dev/layouts. The rules for layouts, mods and sharing live in
-`~/.config/herdr-app/AGENTS.md` (rewritten by the Herdr app on every start).
+This repo shares one Herdr layout, **pixel-hunter**, so it shows up at
+herdr.dev/layouts: a monster-hunting, 8-bit pixel RPG skin with only original
+characters (no Monster Hunter names, monsters or UI). The repo directory keeps
+its old `herdr-monster-hunter` name. The rules for layouts, mods and sharing
+live in `~/.config/herdr-app/AGENTS.md` (rewritten by the Herdr app on every start).
 Read its **Layouts**, **Mods** and **Share** sections before touching anything.
 
 ## Where things live
 
 - **Build in the live config, not here.** The layout is developed in
-  `~/.config/herdr-app/layouts/monster-hunter.json` and
-  `~/.config/herdr-app/mods/monster-hunter*/`, where the window redraws as you
+  `~/.config/herdr-app/layouts/pixel-hunter.json` and
+  `~/.config/herdr-app/mods/pixel-hunter*/`, where the window redraws as you
   edit. This repo holds a copy.
-- `monster-hunter/` is the shared folder, laid out like the Herdr home:
+- `pixel-hunter/` is the shared folder, laid out like the Herdr home:
 
   ```
-  monster-hunter/
-    layouts/monster-hunter.json   (+ its preview svg/png if the layout names one)
+  pixel-hunter/
+    layouts/pixel-hunter.json   (+ its preview svg/png if the layout names one)
     mods/<each mod the layout uses that isn't shipped by Herdr>/
     RECIPE.md                     brief another agent builds it from, empty folder
     preview.png                   screenshot of the layout running
   ```
 
-- `scripts/sync.sh` copies the live layout and its `monster-hunter*` mods into
-  `monster-hunter/`. Run it before every commit. Drop generated files a fresh
+- `scripts/sync.sh` copies the live layout and its `pixel-hunter*` mods into
+  `pixel-hunter/`. Run it before every commit. Drop generated files a fresh
   install recreates (`gpui-kit.d.ts`, `jsconfig.json`) if the script copies them.
 
 ## Publishing checklist
 
 1. Layout works: `herdr-app check ~/.config/herdr-app/mods/<mod>` passes for
-   each mod, and `layout.switch monster-hunter` shows it.
+   each mod, and `layout.switch pixel-hunter` shows it.
 2. `scripts/sync.sh`.
 3. `RECIPE.md` written **from the real files**, in the order the Herdr
    AGENTS.md gives (Name + paragraph + image, What you see, How it behaves,

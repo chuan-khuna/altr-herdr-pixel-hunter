@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Copy the live monster-hunter layout and its mods from the Herdr config into this repo.
+# Copy the live pixel-hunter layout and its mods from the Herdr config into this repo.
 set -euo pipefail
-NAME=monster-hunter
+NAME=pixel-hunter
 HOME_DIR="${HERDR_HOME:-$HOME/.config/herdr-app}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$REPO/$NAME"

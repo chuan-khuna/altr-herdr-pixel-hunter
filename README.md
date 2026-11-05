@@ -1,13 +1,15 @@
-# Monster Hunter — a Herdr layout
+# Pixel Hunter — a Herdr layout
 
-A layout for the [Herdr app](https://herdr.dev). Everything lives in
-[`monster-hunter/`](monster-hunter/); see its [RECIPE.md](monster-hunter/RECIPE.md).
+A monster-hunting, 8-bit pixel RPG layout for the [Herdr app](https://herdr.dev),
+with only original characters: spaces become hunting Areas with their own
+Monster, and agents become a Party of Hunters. Everything lives in
+[`pixel-hunter/`](pixel-hunter/); see its [RECIPE.md](pixel-hunter/RECIPE.md).
 
-![Monster Hunter](monster-hunter/preview.png)
+![Pixel Hunter](pixel-hunter/preview.png)
 
 ## Install
 
-Ask your Herdr agent to add this repo's `monster-hunter/` folder, or copy
-`monster-hunter/layouts/*` into `~/.config/herdr-app/layouts/` and
-`monster-hunter/mods/*` into `~/.config/herdr-app/mods/`, then run
-`layout.switch monster-hunter`. `ctrl-shift-l` switches back.
+Ask your Herdr agent to add this repo's `pixel-hunter/` folder, or copy
+`pixel-hunter/layouts/*` into `~/.config/herdr-app/layouts/` and
+`pixel-hunter/mods/*` into `~/.config/herdr-app/mods/`, then run
+`layout.switch pixel-hunter`. `ctrl-shift-l` switches back.
