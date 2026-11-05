@@ -6,33 +6,9 @@
 <title>pixel-hunter colors</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/pixel-hunter.css">
 <style>
-  /* ---------- pixel-hunter-night tokens (proposal) ---------- */
-  :root {
-    /* environment ramp: cool, desaturated, hue-shifted (no neutral gray) */
-    /* signal + text colors are taken from Lospec palettes (Vinik24, Chasm,
-       Cryptic Ocean). The palettes have no near-black blue-cyan, so the dark
-       ramp is Vinik24 #387080 (hue ~200deg) darkened, low saturation. */
-    --canvas:   #101a24;
-    --chrome:   #15222e;
-    --surface:  #192a38;
-    --selected: #1c2f40;
-    --border:   #2e475b;
-    --dim:      #7e9e99;   /* Vinik24: grey teal */
-    --text:     #c5ccb8;   /* Vinik24: sage cream, not white */
-
-    /* character / signal colors: the saturation budget */
-    --accent:   #95c5ac;   /* Cryptic Ocean: focus frame, rank grade */
-    --hunting:  #7ca1c0;   /* Vinik24: cool, busy, nothing to do */
-    --help:     #f3a787;   /* Chasm: warmest + brightest signal, needs you */
-    --cleared:  #6eaa78;   /* Vinik24: done, look when you like */
-    --hp:       #c38890;   /* Vinik24: monster only */
-    --resting:  var(--dim);
-
-    --px: 2px;             /* one art pixel at 2x */
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; }
+  /* tokens, reset and scrollbars: ../styles/pixel-hunter.css */
   body {
     background: var(--canvas);
     color: var(--text);

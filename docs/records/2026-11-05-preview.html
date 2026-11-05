@@ -6,27 +6,10 @@
 <title>pixel-hunter preview</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Handjet:wght@400;600&family=Jersey+10&family=Micro+5&family=Pixelify+Sans:wght@400;600&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=Tiny5&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/pixel-hunter.css">
 <style>
-  :root {
-    --canvas:   #101a24;
-    --chrome:   #15222e;
-    --surface:  #192a38;
-    --selected: #1c2f40;
-    --border:   #2e475b;
-    --dim:      #7e9e99;
-    --text:     #c5ccb8;
-    --accent:   #95c5ac;
-    --hunting:  #7ca1c0;
-    --help:     #f3a787;
-    --cleared:  #6eaa78;
-    --hp:       #c38890;
-
-    --ui-font: "Pixelify Sans";
-    --ui-size: 15px;
-    --mono: ui-monospace, "SF Mono", Menlo, monospace;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; }
+  /* tokens, reset and scrollbars: ../styles/pixel-hunter.css */
+  :root { --ui-size: 15px; }
   body { background: #0b131b; color: var(--text); font: 15px/1.5 "Pixelify Sans", system-ui, sans-serif; padding: 28px 16px 64px; }
   main { max-width: 1280px; margin: 0 auto; }
   .logo { font-family: "Press Start 2P", monospace; letter-spacing: 0; }
@@ -74,24 +57,23 @@
   .areas { overflow: auto; flex: 1; }
   .area { border-bottom: 2px solid var(--border); padding: 8px 10px 10px; }
   .area.current { background: var(--selected); }
-  .arow { display: flex; align-items: center; gap: 8px; }
-  .arow .chev { color: var(--dim); width: 10px; }
-  .arow .mface { width: 20px; height: 20px; flex-shrink: 0; background-size: 38px 38px; background-position: -9px -6px; border: 2px solid var(--border); }
-  .arow .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .arow .map { color: var(--dim); flex-shrink: 0; }
-  .arow .sp { flex: 1; }
+  .arow { display: grid; grid-template-columns: 10px 76px minmax(0, 1fr); gap: 0 8px; align-items: center; }
+  .arow .chev { color: var(--dim); width: 10px; grid-row: span 3; }
+  .arow .mface { width: 76px; height: 76px; grid-row: span 3; background-size: 76px 76px; border: 2px solid var(--border); }
+  .arow .l1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .arow .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
   .arow .dot { width: 8px; height: 8px; flex-shrink: 0; }
-  .arow .hpm { width: 36px; flex-shrink: 0; }
   .arow .key { color: var(--dim); font-size: .85em; flex-shrink: 0; }
-  .apath { color: var(--dim); font-size: .87em; margin: 1px 0 4px 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .apath b { color: var(--text); font-weight: 400; }
-  .mem { margin: 5px 0 0 16px; padding: 4px 6px; display: grid; grid-template-columns: 38px 1fr; gap: 0 8px; border: 2px solid transparent; cursor: pointer; }
+  .arow .apath, .arow .abr { color: var(--dim); font-size: .87em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .arow .abr { color: var(--text); }
+  .mem { margin: 5px 0 0 16px; padding: 4px 6px; display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 0 8px; border: 2px solid transparent; cursor: pointer; }
   .mem.help { border-color: var(--help); background: #f3a78712; }
   .mem .face { width: 38px; height: 38px; grid-row: span 2; background-size: 38px 38px; border: 2px solid var(--border); }
   .mem .l1 { display: flex; gap: 8px; align-items: baseline; }
   .mem .cls { font-weight: 600; }
   .st { font-weight: 600; font-size: .87em; letter-spacing: .04em; text-transform: uppercase; }
-  .mem .l2 { display: flex; gap: 6px; align-items: center; color: var(--dim); font-size: .9em; white-space: nowrap; }
+  .mem .l2 { display: flex; gap: 6px; align-items: center; color: var(--dim); font-size: .9em; white-space: nowrap; min-width: 0; }
+  .mem .l2 .rk { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .grade { font-weight: 600; font-size: .82em; line-height: 1; color: var(--canvas); background: var(--accent); padding: 2px 4px; }
   .grade.unk { background: var(--dim); }
   .sta { width: 46px; margin-left: auto; flex-shrink: 0; }
@@ -168,6 +150,7 @@
 
   <h2>Herdr window</h2>
   <p class="sub">320 px sidebar. Area <b>shop-api</b> is open with four Hunters in its Party. Click a Hunter card to see how focus moves.</p>
+  <p class="sub">Revised later on 2026-11-05: Area rows have three lines (space name, path, branch) beside a 76 px Monster face. The map name and HP bar appear only in the arena, so the row no longer repeats them.</p>
   <div class="winwrap"><div class="win ui" id="win"></div></div>
 
   <h2>Hunters (Class)</h2>
@@ -343,8 +326,16 @@ function memberRow(h, st, i, extra = '') {
   return `<div class="mem ${st==='help'?'help':''}" data-i="${i}">
     <div class="face px" style="${face(h.ch)}"></div>
     <div class="l1"><span class="cls">${h.cls}</span><span class="st" style="color:${s.color}">${s.label}</span></div>
-    <div class="l2"><span class="grade ${h.rank[0]==='?'?'unk':''}">${h.rank[0]}</span>${h.rank[1]}${extra}${sta}</div>
+    <div class="l2"><span class="grade ${h.rank[0]==='?'?'unk':''}">${h.rank[0]}</span><span class="rk">${h.rank[1]}${extra}</span>${sta}</div>
   </div>`;
+}
+// Area row: the Monster's face spans three lines (space name, path, branch).
+// The map name and HP are shown only in the arena, so the row doesn't repeat them.
+function areaRow(open, map, name, dot, key, path, branch) {
+  return `<div class="arow"><span class="chev">${open?'▾':'▸'}</span><span class="mface px" style="${mface(map)}"></span>
+    <div class="l1"><span class="name">${name}</span><span class="dot" style="background:${dot}"></span><span class="key">${key}</span></div>
+    <div class="apath">${path}</div>
+    <div class="abr">${branch ? '⎇ ' + branch : ''}</div></div>`;
 }
 function worst(sts) { return ['help','hunting','cleared','resting'].find(x => sts.includes(x)); }
 
@@ -357,22 +348,18 @@ function renderWindow() {
     <div id="arenaSlot"></div>
     <div class="areas">
       <div class="area current">
-        <div class="arow"><span class="chev">▾</span><span class="mface px" style="${mface('forest')}"></span><span class="name">shop-api</span><span class="map">· Forest</span><span class="sp"></span><span class="dot" style="background:${ST[worst(sts)].color}"></span><span class="bar hpm"><i style="width:${mode==='slain'?0:mode==='hit'?58:100}%;background:var(--hp)"></i></span><span class="key">⌃1</span></div>
-        <div class="apath">~/code/shop-api · <b>feat/login</b></div>
+        ${areaRow(true, 'forest', 'shop-api', ST[worst(sts)].color, '⌃1', '~/code/shop-api', 'feat/login')}
         ${party.map((h,i) => memberRow(h, sts[i], i, i===1 ? ' · ⎇ fix/cart' : '')).join('')}
       </div>
       <div class="area">
-        <div class="arow"><span class="chev">▸</span><span class="mface px" style="${mface('desert')}"></span><span class="name">herdr-monster-hunter</span><span class="map">· Desert</span><span class="sp"></span><span class="dot" style="background:var(--cleared)"></span><span class="bar hpm"><i style="width:0%"></i></span><span class="key">⌃2</span></div>
-        <div class="apath">~/Documents/code/personal/herdr-monster-hunter · <b>main</b></div>
+        ${areaRow(false, 'desert', 'herdr-monster-hunter', 'var(--cleared)', '⌃2', '~/Documents/code/personal/herdr-monster-hunter', 'main')}
       </div>
       <div class="area">
-        <div class="arow"><span class="chev">▾</span><span class="mface px" style="${mface('dungeon')}"></span><span class="name">Login fix</span><span class="map">· Dungeon</span><span class="sp"></span><span class="dot" style="background:var(--hunting)"></span><span class="bar hpm"><i style="width:80%;background:var(--hp)"></i></span><span class="key">⌃3</span></div>
-        <div class="apath">~/code/auth-service · <b>fix/session</b></div>
+        ${areaRow(true, 'dungeon', 'Login fix', 'var(--hunting)', '⌃3', '~/code/auth-service', 'fix/session')}
         ${memberRow(HUNTERS[5], 'hunting', 9)}
       </div>
       <div class="area">
-        <div class="arow"><span class="chev">▸</span><span class="mface px" style="${mface('field')}"></span><span class="name">dotfiles</span><span class="map">· Field</span><span class="sp"></span><span class="dot" style="background:var(--dim)"></span><span class="bar hpm"><i style="width:100%;background:var(--hp)"></i></span><span class="key">⌃4</span></div>
-        <div class="apath">~/dotfiles · <b>main</b></div>
+        ${areaRow(false, 'field', 'dotfiles', 'var(--dim)', '⌃4', '~/dotfiles', null)}
       </div>
     </div>
   </aside>

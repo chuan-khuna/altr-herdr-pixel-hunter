@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hunter row options</title>
+<link rel="stylesheet" href="../styles/pixel-hunter.css">
+<style>
+  main { max-width: 1280px; }
+  .variants { display: grid; grid-template-columns: repeat(auto-fill, minmax(336px, 1fr)); gap: 16px; align-items: start; }
+  .variant { padding: 0; overflow: hidden; }
+  .variant header { padding: 10px 12px; border-bottom: var(--px) solid var(--border); }
+  .variant header b { color: var(--accent); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: 13px; }
+  .variant header p { margin: 4px 0 0; color: var(--dim); font-size: 13px; }
+  .side { width: 320px; background: var(--chrome); padding: 6px 0 10px; }
+  .face { width: 38px; height: 38px; background-size: 38px 38px; border: var(--px) solid var(--border); flex-shrink: 0; image-rendering: pixelated; }
+  .pface { width: 20px; height: 20px; background-size: 20px 20px; border: var(--px) solid var(--border); flex-shrink: 0; image-rendering: pixelated; }
+  .grade { font-weight: 600; font-size: .78em; line-height: 1; color: var(--canvas); background: var(--accent); padding: 2px 4px; }
+  .grade.unk { background: var(--dim); }
+  .st { font-weight: 600; font-size: .82em; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+  .dim { color: var(--dim); }
+  .bar { height: 8px; background: var(--canvas); border: var(--px) solid var(--border); position: relative; flex-shrink: 0; }
+  .bar i { position: absolute; inset: 0 auto 0 0; display: block; }
+  .tok { font-size: .8em; color: var(--dim); white-space: nowrap; }
+  .prog { font-size: .75em; color: var(--dim); border: 1px solid var(--border); padding: 0 4px; white-space: nowrap; }
+  .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .help { border-color: var(--help) !important; background: #f3a78712; }
+
+  /* Hunter row shell shared by the variants */
+  .mem { margin: 4px 8px 0 16px; padding: 4px 6px; border: var(--px) solid transparent; }
+  /* Pet rows (decision Q4: indented, max 2, then [+N]) */
+  .pet { display: flex; align-items: center; gap: 6px; margin: 2px 8px 0 40px; padding: 1px 6px; font-size: .85em; border: var(--px) solid transparent; }
+  .pet .ptype { color: var(--text); white-space: nowrap; }
+  .pet .pdesc { color: var(--dim); }
+  .pet .pst { margin-left: auto; font-weight: 600; }
+  .more { margin: 2px 8px 0 46px; font-size: .8em; color: var(--dim); }
+  /* inline Pet chips (variant C/D alternative to Q4) */
+  .chips { display: inline-flex; gap: 2px; align-items: center; margin-left: 4px; }
+  .chips .pface { width: 16px; height: 16px; background-size: 16px 16px; border-width: 1px; }
+  .chips .pface.h { border-color: var(--help); }
+  .chips .m { font-size: .75em; color: var(--dim); margin-left: 2px; }
+
+  /* variant F: one line of Pet icons under the Hunter */
+  .petline { grid-column: 3; display: flex; gap: 3px; align-items: center; margin-top: 3px; }
+  .petline .pface { width: 18px; height: 18px; background-size: 18px 18px; border-width: 1px; }
+  .petline .pface.h { border: var(--px) solid var(--help); }
+  .petline .m { font-size: .75em; color: var(--dim); margin-left: 2px; }
+  .variant.chosen { border-color: var(--accent); }
+  table.fields td:first-child { white-space: nowrap; font-weight: 600; }
+  table.fields td { font-size: 14px; }
+  ol.q li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hunter row options</h1>
+  <p class="sub">Which details a Hunter row in the sidebar should show, and six ways to lay them out at the real 320 px width. Every variant shows the same five Hunters. Pet faces are real Ninja Adventure animal portraits (CC0). Design record, 2026-11-05, from the Pet (subagent) discussion. Status: decided, layout F.</p>
+
+  <nav class="toc card"><b>Contents</b>
+    <ol>
+      <li><a href="#fields">Fields a Hunter can show</a></li>
+      <li><a href="#variants">Six layouts</a></li>
+      <li><a href="#open">Decisions</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="fields">Fields a Hunter can show</h2>
+  <table class="fields">
+    <tr><th>Field</th><th>Example</th><th>Comes from</th><th>When it's missing</th></tr>
+    <tr><td>Profile</td><td>Knight face (38 px)</td><td>The Hunter's Class (order of appearance, or pinned per tab)</td><td>Always present</td></tr>
+    <tr><td>Name</td><td><code>Knight</code> / <code>login</code> / <code>fix login bug</code></td><td>Class name, the Herdr tab name, or the Claude Code session name (<code>session_name</code> in the statusLine input)</td><td>Fall back to the Class name</td></tr>
+    <tr><td>Program</td><td><code>Claude Code</code>, <code>Codex</code>, <code>Gemini</code></td><td>Herdr's <code>program.name</code> (the agent's own report)</td><td>A plain terminal reports no status, so it isn't a Hunter at all</td></tr>
+    <tr><td>Model (Rank)</td><td><code>[A] Opus 5.5</code>, <code>[?] gpt-5.5</code></td><td>statusLine script (Claude Code only today) plus the grade table</td><td><code>[?]</code> plus the program name</td></tr>
+    <tr><td>State</td><td>⚔ Hunting, ! Needs help, ✓ Cleared, z Resting</td><td>Herdr agent status</td><td>Always present for a Hunter</td></tr>
+    <tr><td>Context (Stamina)</td><td>bar plus <code>72k/200k</code></td><td>statusLine <code>context_window</code></td><td><code>STA —</code>, never estimated</td></tr>
+    <tr><td>Pets</td><td>Dog Explore · find auth middleware</td><td>Pet hooks (<code>docs/documents/pet-tracking-hooks.md</code>)</td><td>No Pet rows</td></tr>
+    <tr><td>Branch</td><td><code>⎇ fix/cart</code></td><td>Pane's git branch, shown only when it differs from the Area's</td><td>Hidden</td></tr>
+  </table>
+  <p class="sub">In layouts A–E <code>72k/200k</code> means context <b>left</b> / window size. The decision (layout F) is <b>used</b> / window size, <code>128k/200k</code>, beside a Stamina bar that still shows what is left.</p>
+
+  <h2 id="variants">Six layouts</h2>
+  <div class="variants" id="variants-grid"></div>
+
+  <h2 id="open">Decisions</h2>
+  <p class="sub">These were the open questions. All four are now decided, and layout <b>F</b> shows the result.</p>
+  <ol class="q">
+    <li><b>Name.</b> The Herdr tab name leads. The Class name follows it, dim.</li>
+    <li><b>Context text.</b> Used / window size (<code>128k/200k</code>), as Claude Code shows it. The bar stays Stamina (what's left), so it shrinks as the number grows, with the same blue → cream → peach colours.</li>
+    <li><b>Program.</b> Shown only when it isn't Claude Code (<code>Monk · Codex</code>).</li>
+    <li><b>Pets.</b> One line of animal icons under the Hunter, max 2 then <code>[+N]</code>. This replaces the indented Pet rows decided earlier (Q4). Needs help puts a peach frame on the icon. Hover shows type and task.</li>
+  </ol>
+</main>
+
+<script>
+const NA = '2026-11-05-preview/na';
+const AN = '2026-11-05-hunter-row/animals';
+const face = c => `background-image:url(${NA}/chars/${c}/Faceset.png)`;
+const pface = a => `background-image:url(${AN}/${a}.png)`;
+const ST = {
+  hunting: { icon: '⚔', label: 'Hunting',    color: 'var(--hunting)' },
+  help:    { icon: '!', label: 'Needs help', color: 'var(--help)' },
+  cleared: { icon: '✓', label: 'Cleared',    color: 'var(--cleared)' },
+  resting: { icon: 'z', label: 'Resting',    color: 'var(--dim)' },
+};
+const staColor = v => v == null ? 'var(--dim)' : v < 20 ? 'var(--help)' : v < 50 ? 'var(--text)' : 'var(--hunting)';
+
+const HUNTERS = [
+  { ch: 'Knight', cls: 'Knight', tab: 'login', session: 'fix login token refresh', prog: 'Claude Code', grade: 'A', model: 'Opus 5.5', st: 'hunting', left: 72, size: 200,
+    pets: [ { a: 'Dog', type: 'Explore', desc: 'find auth middleware', st: 'hunting' },
+            { a: 'Cat', type: 'general-purpose', desc: 'run the test suite', st: 'hunting' },
+            { a: 'Frog' }, { a: 'Cub' }, { a: 'Racoon' } ] },
+  { ch: 'SorcererBlack', cls: 'Mage', tab: 'cart', session: 'cart discount bug', prog: 'Claude Code', grade: 'B', model: 'Sonnet 5.5', st: 'help', left: 148, size: 200, branch: 'fix/cart',
+    pets: [ { a: 'Frog', type: 'Plan', desc: 'draft the price migration', st: 'help' } ] },
+  { ch: 'NinjaMasked', cls: 'Rogue', tab: 'tests', session: 'flaky e2e tests', prog: 'Claude Code', grade: 'A', model: 'Opus 5.5 1M', st: 'cleared', left: 590, size: 1000, pets: [] },
+  { ch: 'Monk', cls: 'Monk', tab: 'api', session: null, prog: 'Codex', grade: '?', model: 'gpt-5.5', st: 'resting', left: null, size: null, pets: [] },
+  { ch: 'Samurai', cls: 'Samurai', tab: 'docs', session: 'write release notes', prog: 'Claude Code', grade: 'C', model: 'Haiku 5.5', st: 'hunting', left: 30, size: 200,
+    pets: [ { a: 'Dog2', type: 'Explore', desc: 'collect merged PR titles', st: 'hunting' } ] },
+];
+
+const pct = h => h.left == null ? null : Math.round(h.left / h.size * 100);
+const k = n => n >= 1000 ? (n / 1000) + 'M' : n + 'k';
+const tok = h => h.left == null ? '—' : `${k(h.left)}/${k(h.size)}`;
+const bar = (h, w) => h.left == null ? `<span class="tok" style="margin-left:auto">STA —</span>`
+  : `<span class="bar" style="width:${w}px"><i style="width:${pct(h)}%;background:${staColor(pct(h))}"></i></span>`;
+const grade = h => `<span class="grade ${h.grade === '?' ? 'unk' : ''}">${h.grade}</span>`;
+const st = (h, full = true) => `<span class="st" style="color:${ST[h.st].color}">${ST[h.st].icon}${full ? ' ' + ST[h.st].label : ''}</span>`;
+const isHelp = h => h.st === 'help' || h.pets.some(p => p.st === 'help');
+
+// Pet rows: decision Q4 (max 2 rows, then [+N]). Needs help first, then Hunting.
+function petRows(h) {
+  const named = h.pets.filter(p => p.type).sort((a, b) => (a.st === 'help' ? 0 : 1) - (b.st === 'help' ? 0 : 1));
+  const shown = named.slice(0, 2), more = h.pets.length - shown.length;
+  return shown.map(p => `<div class="pet ${p.st === 'help' ? 'help' : ''}">
+      <span class="pface" style="${pface(p.a)}"></span><span class="ptype">${p.type}</span><span class="pdesc ell">· ${p.desc}</span>
+      <span class="pst" style="color:${ST[p.st].color}">${ST[p.st].icon}</span></div>`).join('')
+    + (more > 0 ? `<div class="more">[+${more}]</div>` : '');
+}
+// Inline Pet chips: alternative for variants C and D.
+function petChips(h) {
+  if (!h.pets.length) return '';
+  const shown = h.pets.slice(0, 2), more = h.pets.length - shown.length;
+  return `<span class="chips">${shown.map(p => `<span class="pface ${p.st === 'help' ? 'h' : ''}" style="${pface(p.a)}" title="${p.type ?? ''}"></span>`).join('')}${more > 0 ? `<span class="m">[+${more}]</span>` : ''}</span>`;
+}
+
+const VARIANTS = [
+  { id: 'A', name: 'Today + tokens', note: 'Closest to the current row. Adds the program after the model and the token count next to the bar. Pet rows as decided in Q4.',
+    row: h => `<div class="mem ${isHelp(h) && h.st === 'help' ? 'help' : ''}" style="display:grid;grid-template-columns:38px minmax(0,1fr);gap:0 8px">
+      <span class="face" style="${face(h.ch)};grid-row:span 2"></span>
+      <div style="display:flex;gap:8px;align-items:baseline"><b>${h.cls}</b>${st(h)}</div>
+      <div style="display:flex;gap:6px;align-items:center;font-size:.9em" class="dim">${grade(h)}<span class="ell">${h.model}${h.branch ? ' · ⎇ ' + h.branch : ''}</span>
+        <span style="margin-left:auto;display:flex;gap:4px;align-items:center">${h.left == null ? '' : `<span class="tok">${tok(h)}</span>`}${bar(h, 40)}</span></div>
+    </div>${petRows(h)}` },
+
+  { id: 'B', name: 'Name first, three lines', note: 'The tab name leads, because it says what the work is. Class and program on line 2. Model, a full-width bar and tokens on line 3.',
+    row: h => `<div class="mem ${h.st === 'help' ? 'help' : ''}" style="display:grid;grid-template-columns:38px minmax(0,1fr);gap:0 8px">
+      <span class="face" style="${face(h.ch)};grid-row:span 3;align-self:center"></span>
+      <div style="display:flex;gap:8px;align-items:baseline"><b class="ell">${h.tab}</b><span style="margin-left:auto">${st(h)}</span></div>
+      <div class="dim" style="font-size:.85em;display:flex;gap:6px"><span>${h.cls}</span>·<span>${h.prog}</span>${h.branch ? `<span class="ell">· ⎇ ${h.branch}</span>` : ''}</div>
+      <div style="display:flex;gap:6px;align-items:center;font-size:.85em">${grade(h)}<span class="ell">${h.model}</span>
+        <span style="margin-left:auto;display:flex;gap:4px;align-items:center">${bar(h, 56)}${h.left == null ? '' : `<span class="tok">${tok(h)}</span>`}</span></div>
+    </div>${petRows(h)}` },
+
+  { id: 'C', name: 'Session name + chips', note: 'Claude Code session name as the title (Class name when there is none). Pets as inline face chips on line 1, so the row never grows.',
+    row: h => `<div class="mem ${isHelp(h) ? 'help' : ''}" style="display:grid;grid-template-columns:38px minmax(0,1fr);gap:0 8px">
+      <span class="face" style="${face(h.ch)};grid-row:span 2"></span>
+      <div style="display:flex;gap:6px;align-items:center;min-width:0"><b class="ell">${h.session ?? h.cls}</b>${petChips(h)}<span style="margin-left:auto">${st(h, false)}</span></div>
+      <div style="display:flex;gap:6px;align-items:center;font-size:.85em" class="dim"><span class="prog">${h.prog}</span>${grade(h)}<span class="ell">${h.model}</span>
+        <span style="margin-left:auto;display:flex;gap:4px;align-items:center">${h.left == null ? '' : `<span class="tok">${tok(h)}</span>`}${bar(h, 36)}</span></div>
+    </div>` },
+
+  { id: 'D', name: 'Dense, one line + bar', note: 'For many Hunters: a 24 px face, one text line, and a thin full-width Stamina bar under it. State shows as its icon only.',
+    row: h => `<div class="mem ${isHelp(h) ? 'help' : ''}" style="padding:3px 6px">
+      <div style="display:flex;gap:6px;align-items:center;min-width:0">
+        <span class="face" style="${face(h.ch)};width:24px;height:24px;background-size:24px 24px"></span>
+        ${st(h, false)}<b class="ell" style="max-width:80px">${h.cls}</b>${grade(h)}<span class="dim ell" style="font-size:.85em">${h.model.split(' ')[0]}</span>${petChips(h)}
+        <span class="tok" style="margin-left:auto">${tok(h)}</span></div>
+      ${h.left == null ? '' : `<div class="bar" style="height:4px;border-width:1px;margin:3px 0 0 30px"><i style="width:${pct(h)}%;background:${staColor(pct(h))}"></i></div>`}
+    </div>` },
+
+  { id: 'E', name: 'State strip', note: 'A 4 px strip in the state colour on the left edge makes the state readable at a squint. Name and program on line 1, model and tokens on line 2. Pet rows as in Q4.',
+    row: h => `<div class="mem ${h.st === 'help' ? 'help' : ''}" style="display:grid;grid-template-columns:4px 38px minmax(0,1fr);gap:0 8px;padding-left:0">
+      <span style="grid-row:span 2;background:${ST[h.st].color};align-self:stretch"></span>
+      <span class="face" style="${face(h.ch)};grid-row:span 2"></span>
+      <div style="display:flex;gap:6px;align-items:baseline;min-width:0"><b>${h.cls}</b><span class="dim ell" style="font-size:.85em">${h.tab} · ${h.prog}</span><span style="margin-left:auto">${st(h, false)}</span></div>
+      <div style="display:flex;gap:6px;align-items:center;font-size:.85em">${grade(h)}<span class="dim ell">${h.model}</span>
+        <span style="margin-left:auto;display:flex;gap:4px;align-items:center">${h.left == null ? '<span class="tok">STA —</span>' : `${bar(h, 44)}<span class="tok">${tok(h)}</span>`}</span></div>
+    </div>${petRows(h)}` },
+
+  { id: 'F', name: 'E + icon Pets (chosen)', note: 'E\'s row with the decisions so far: tab name first, Class (and the program when it isn\'t Claude Code) dim after it, used/total tokens beside the Stamina bar. Pets sit on one line of icons under the Hunter, max 2 and then [+N]. A peach frame marks a Pet that Needs help, and hovering shows its type and task.',
+    row: h => {
+      const used = h.left == null ? null : `${k(h.size - h.left)}/${k(h.size)}`;
+      const sorted = [...h.pets].sort((a, b) => (a.st === 'help' ? 0 : 1) - (b.st === 'help' ? 0 : 1));
+      const shown = sorted.slice(0, 2), more = h.pets.length - shown.length;
+      const pets = h.pets.length ? `<div class="petline">${shown.map(p => `<span class="pface ${p.st === 'help' ? 'h' : ''}" style="${pface(p.a)}" title="${p.type ? p.type + ' · ' + p.desc : 'Pet'}"></span>`).join('')}${more > 0 ? `<span class="m">[+${more}]</span>` : ''}</div>` : '';
+      return `<div class="mem ${h.st === 'help' ? 'help' : ''}" style="display:grid;grid-template-columns:4px 38px minmax(0,1fr);gap:0 8px;padding-left:0">
+      <span style="grid-row:span ${h.pets.length ? 3 : 2};background:${ST[h.st].color};align-self:stretch"></span>
+      <span class="face" style="${face(h.ch)};grid-row:span 2"></span>
+      <div style="display:flex;gap:6px;align-items:baseline;min-width:0"><b class="ell">${h.tab}</b><span class="dim ell" style="font-size:.85em">${h.cls}${h.prog !== 'Claude Code' ? ' · ' + h.prog : ''}${h.branch ? ' · ⎇ ' + h.branch : ''}</span><span style="margin-left:auto">${st(h, false)}</span></div>
+      <div style="display:flex;gap:6px;align-items:center;font-size:.85em">${grade(h)}<span class="dim ell">${h.model}</span>
+        <span style="margin-left:auto;display:flex;gap:4px;align-items:center">${used == null ? '<span class="tok">STA —</span>' : `<span class="tok">${used}</span>${bar(h, 44)}`}</span></div>
+      ${pets}
+    </div>`; } },
+];
+
+document.getElementById('variants-grid').innerHTML = VARIANTS.map(v => `
+  <section class="variant card ${v.id === 'F' ? 'chosen' : ''}">
+    <header><b>${v.id} · ${v.name}</b><p>${v.note}</p></header>
+    <div class="side">${HUNTERS.map(v.row).join('')}</div>
+  </section>`).join('');
+</script>
+</body>
+</html>
