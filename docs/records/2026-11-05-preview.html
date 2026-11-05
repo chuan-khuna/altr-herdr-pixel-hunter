@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pixel-hunter preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Handjet:wght@400;600&family=Jersey+10&family=Micro+5&family=Pixelify+Sans:wght@400;600&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=Tiny5&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --canvas:   #101a24;
+    --chrome:   #15222e;
+    --surface:  #192a38;
+    --selected: #1c2f40;
+    --border:   #2e475b;
+    --dim:      #7e9e99;
+    --text:     #c5ccb8;
+    --accent:   #95c5ac;
+    --hunting:  #7ca1c0;
+    --help:     #f3a787;
+    --cleared:  #6eaa78;
+    --hp:       #c38890;
+
+    --ui-font: "Pixelify Sans";
+    --ui-size: 15px;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: #0b131b; color: var(--text); font: 15px/1.5 "Pixelify Sans", system-ui, sans-serif; padding: 28px 16px 64px; }
+  main { max-width: 1280px; margin: 0 auto; }
+  .logo { font-family: "Press Start 2P", monospace; letter-spacing: 0; }
+  h1 { font-size: 18px; margin: 0 0 10px; }
+  h2 { font-size: 18px; font-weight: 600; color: var(--accent); margin: 44px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .sub { color: var(--dim); margin: 0 0 14px; max-width: 80ch; }
+  a { color: var(--hunting); }
+  code { font-family: var(--mono); font-size: .85em; background: var(--surface); padding: 1px 5px; }
+  .ui { font-family: var(--ui-font), system-ui, sans-serif; font-size: var(--ui-size); }
+  .px { image-rendering: pixelated; }
+  .card { background: var(--chrome); border: 2px solid var(--border); box-shadow: 4px 4px 0 #0a1219; }
+
+  /* ---------- font picker ---------- */
+  .fonts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .font { padding: 12px 14px; cursor: pointer; text-align: left; color: var(--text); font: inherit; }
+  .font[aria-pressed="true"] { border-color: var(--accent); }
+  .font .fname { font: 600 13px "Pixelify Sans", sans-serif; color: var(--dim); display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .font[aria-pressed="true"] .fname { color: var(--accent); }
+  .font .s1 { font-weight: 600; }
+  .font .s2 { color: var(--dim); }
+  .font .s3 { display: flex; gap: 10px; align-items: center; }
+  .font .s3 b { font-weight: 600; letter-spacing: .04em; }
+  .sticky { position: sticky; top: 0; z-index: 5; background: #0b131bee; padding: 8px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chip { font: 600 13px "Pixelify Sans", sans-serif; color: var(--text); background: var(--surface); border: 2px solid var(--border); padding: 4px 10px; cursor: pointer; }
+  .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  .sticky .lbl { color: var(--dim); font-size: 13px; margin-right: 4px; }
+
+  /* ---------- herdr window ---------- */
+  .winwrap { overflow-x: auto; padding: 4px 8px 12px 0; }
+  .win { width: 1240px; height: 760px; display: grid; grid-template-columns: 320px 1fr; background: var(--canvas); border: 1px solid #000; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+  .side { background: var(--chrome); border-right: 2px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .side-top { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 2px solid var(--border); }
+  .lights { display: flex; gap: 8px; margin-right: 10px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .side-top .logo { font-size: 10px; color: var(--text); flex: 1; }
+  .side-top .gear { color: var(--dim); }
+
+  .arena { position: relative; width: 320px; height: 192px; border-bottom: 2px solid var(--border); background-size: 320px 192px; overflow: hidden; }
+  .arena .who { position: absolute; }
+  .arena .hpwrap { position: absolute; right: 12px; bottom: 8px; width: 110px; font-size: 12px; color: var(--dim); text-align: right; }
+  .arena .mapname { position: absolute; left: 10px; bottom: 6px; font-size: 12px; color: var(--text); background: #101a24cc; padding: 0 6px; }
+  .bar { height: 8px; background: var(--canvas); border: 2px solid var(--border); position: relative; }
+  .bar i { position: absolute; inset: 0 auto 0 0; display: block; }
+
+  .areas { overflow: auto; flex: 1; }
+  .area { border-bottom: 2px solid var(--border); padding: 8px 10px 10px; }
+  .area.current { background: var(--selected); }
+  .arow { display: flex; align-items: center; gap: 8px; }
+  .arow .chev { color: var(--dim); width: 10px; }
+  .arow .mface { width: 20px; height: 20px; flex-shrink: 0; background-size: 38px 38px; background-position: -9px -6px; border: 2px solid var(--border); }
+  .arow .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .arow .map { color: var(--dim); flex-shrink: 0; }
+  .arow .sp { flex: 1; }
+  .arow .dot { width: 8px; height: 8px; flex-shrink: 0; }
+  .arow .hpm { width: 36px; flex-shrink: 0; }
+  .arow .key { color: var(--dim); font-size: .85em; flex-shrink: 0; }
+  .apath { color: var(--dim); font-size: .87em; margin: 1px 0 4px 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .apath b { color: var(--text); font-weight: 400; }
+  .mem { margin: 5px 0 0 16px; padding: 4px 6px; display: grid; grid-template-columns: 38px 1fr; gap: 0 8px; border: 2px solid transparent; cursor: pointer; }
+  .mem.help { border-color: var(--help); background: #f3a78712; }
+  .mem .face { width: 38px; height: 38px; grid-row: span 2; background-size: 38px 38px; border: 2px solid var(--border); }
+  .mem .l1 { display: flex; gap: 8px; align-items: baseline; }
+  .mem .cls { font-weight: 600; }
+  .st { font-weight: 600; font-size: .87em; letter-spacing: .04em; text-transform: uppercase; }
+  .mem .l2 { display: flex; gap: 6px; align-items: center; color: var(--dim); font-size: .9em; white-space: nowrap; }
+  .grade { font-weight: 600; font-size: .82em; line-height: 1; color: var(--canvas); background: var(--accent); padding: 2px 4px; }
+  .grade.unk { background: var(--dim); }
+  .sta { width: 46px; margin-left: auto; flex-shrink: 0; }
+
+  .work { display: flex; flex-direction: column; min-width: 0; }
+  .tabs { height: 44px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-bottom: 2px solid var(--border); background: var(--chrome); }
+  .tab { height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 4px; border: 2px solid var(--border); background: var(--surface); }
+  .tab.on { border-color: var(--accent); background: var(--selected); }
+  .tab .head { width: 24px; height: 24px; background-size: 38px 38px; background-position: -7px -5px; }
+  .tab .dot { width: 8px; height: 8px; }
+  .tab.plus { padding: 0 10px; color: var(--dim); }
+  .tabs .sp { flex: 1; }
+  .tbtn { width: 32px; height: 32px; display: grid; place-items: center; border: 2px solid var(--border); color: var(--dim); background: var(--surface); }
+  .panes { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; min-height: 0; }
+  .pane { border: 2px solid var(--border); display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--canvas); }
+  .pane.focus { border-color: var(--accent); }
+  .pane.help { border-color: var(--help); }
+  .phead { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 3px; background: var(--surface); border-bottom: 2px solid var(--border); white-space: nowrap; overflow: hidden; font-size: .93em; }
+  .phead .head { width: 24px; height: 24px; background-size: 38px 38px; background-position: -7px -5px; flex-shrink: 0; }
+  .phead .dimt { color: var(--dim); overflow: hidden; text-overflow: ellipsis; }
+  .phead .sp { flex: 1; }
+  .term { flex: 1; padding: 10px 12px; font: 12.5px/1.55 var(--mono); color: #c9d1cc; overflow: hidden; white-space: pre-wrap; }
+  .term .c1 { color: var(--hunting); } .term .c2 { color: var(--cleared); } .term .c3 { color: var(--help); } .term .c4 { color: var(--dim); }
+  .term .box { border: 1px solid var(--help); padding: 6px 8px; margin-top: 8px; display: block; }
+
+  /* ---------- galleries ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .g { padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .g .stage { width: 100%; height: 110px; display: grid; place-items: center; background: var(--canvas); border: 2px solid var(--border); position: relative; }
+  .g .nm { font-weight: 600; }
+  .g .meta { color: var(--dim); font-size: .87em; text-align: center; }
+  .g .faces { display: flex; gap: 8px; align-items: center; }
+  .g .faces span.px { flex-shrink: 0; width: 38px; height: 38px; background-size: 38px 38px; border: 2px solid var(--border); display: block; }
+  .areagrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+  .ag { padding: 0; overflow: hidden; }
+  .ag .arena { border-bottom: 2px solid var(--border); }
+  .ag .cap { padding: 8px 12px; display: flex; justify-content: space-between; color: var(--dim); }
+  .ag .cap b { color: var(--text); font-weight: 600; }
+
+  /* ---------- sprites ---------- */
+  .spr { position: relative; image-rendering: pixelated; background-repeat: no-repeat; }
+  .bang { position: absolute; left: 50%; top: -22px; transform: translateX(-50%); font: 600 20px "Pixelify Sans", sans-serif; color: var(--help); animation: blink .8s steps(1) infinite; }
+  .zz { position: absolute; right: -8px; top: -14px; font: 600 14px "Pixelify Sans", sans-serif; color: var(--dim); animation: float 2.4s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes float { 0% { transform: translate(0,4px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(6px,-10px); opacity: 0; } }
+  @keyframes lunge { 0%,49% { transform: translateX(0); } 50%,100% { transform: translateX(6px); } }
+  @keyframes hop { 0%,70%,100% { transform: translateY(0); } 80% { transform: translateY(-10px); } 90% { transform: translateY(-4px); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+  .slain { filter: grayscale(1) brightness(.6); opacity: .55; transform: rotate(90deg) translateY(10px); transition: all .6s steps(4); }
+
+  .note { color: var(--dim); font-size: 13px; margin-top: 10px; }
+  ul.find { color: var(--dim); margin: 0; padding-left: 18px; max-width: 90ch; }
+  ul.find li { margin-bottom: 6px; } ul.find b { color: var(--text); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="logo">pixel-hunter preview</h1>
+  <p class="sub">A mock of the full Herdr window with real Ninja Adventure sprites (CC0, pixel-boy &amp; AAA), plus galleries of Hunters, Monsters and Areas. Click a font below and the whole page switches to it. Design record, 2026-11-05.</p>
+
+  <div class="sticky" id="stateBar">
+    <span class="lbl">Party state:</span>
+    <button class="chip" data-st="mixed" aria-pressed="true">Mixed</button>
+    <button class="chip" data-st="hunting" aria-pressed="false">All Hunting</button>
+    <button class="chip" data-st="help" aria-pressed="false">Needs help</button>
+    <button class="chip" data-st="cleared" aria-pressed="false">All Cleared (Slain)</button>
+    <button class="chip" data-st="resting" aria-pressed="false">All Resting</button>
+    <span class="lbl" style="margin-left:12px">Font: <b id="curFont" style="color:var(--accent)">Pixelify Sans</b></span>
+  </div>
+
+  <h2>Font comparison</h2>
+  <p class="sub">All fonts are OFL on Google Fonts, so they can ship with the layout. Each font gets its own size, because pixel fonts only look sharp at their native grid. Click one to apply it to the whole page.</p>
+  <div class="fonts" id="fonts"></div>
+
+  <h2>Herdr window</h2>
+  <p class="sub">320 px sidebar. Area <b>shop-api</b> is open with four Hunters in its Party. Click a Hunter card to see how focus moves.</p>
+  <div class="winwrap"><div class="win ui" id="win"></div></div>
+
+  <h2>Hunters (Class)</h2>
+  <p class="sub">Each Hunter is a 16×16 sprite shown at 3×, facing right toward the Monster, with a 38 px face. The pack has only <b>one frame per direction</b> for Attack, Jump and Item, so motion is made by swapping frames and moving the sprite by a few pixels.</p>
+  <div class="grid ui" id="hunters"></div>
+
+  <h2>Monsters</h2>
+  <p class="sub">Bosses are 40 to 68 px with real multi-frame Idle and Hit animations. Hit plays while the Party is Hunting.</p>
+  <div class="grid ui" id="monsters"></div>
+
+  <h2>Areas</h2>
+  <p class="sub">Each arena is 160×96 art px built from the pack's tiles and shown at 2×. Following Valve's "quiet world" rule, every arena is desaturated and sunk toward the canvas color so the sprites stand out.</p>
+  <div class="areagrid ui" id="areas"></div>
+
+  <h2>Found while building this</h2>
+  <ul class="find">
+    <li><b>The floor tileset has snow and an orange (lava-like) ground</b>, plus snowy trees. The Snow and Volcano Areas we postponed may need much less work than expected.</li>
+    <li><b>Hunter animation is thin.</b> Idle, Attack, Jump and Item are one frame per direction. Only Walk has 4 frames. Hunting is shown as an Idle and Attack swap with a 6 px lunge.</li>
+    <li><b>Monster sizes vary</b> (Frog 40 px, Tengu 68 px). The arena aligns them by their feet.</li>
+    <li><b>Giant Spirit is a fireball</b>, which reads more like a Volcano monster than a Dungeon one. Once Volcano exists it can move there, and Dungeon can take Demon Cyclops or a skeleton.</li>
+    <li>The <code>Hunter</code> character carries a bow, so it works as the Archer.</li>
+  </ul>
+</main>
+
+<script>
+const NA = '2026-11-05-preview/na';
+const ARENA = n => `2026-11-05-preview/arena-${n}.png`;
+
+const HUNTERS = [
+  { cls: 'Knight',  ch: 'Knight',        rank: ['A','Opus 5.5'],   sta: 72 },
+  { cls: 'Mage',    ch: 'SorcererBlack', rank: ['B','Sonnet 5.5'], sta: 24 },
+  { cls: 'Archer',  ch: 'Hunter',        rank: ['?','codex'],      sta: null },
+  { cls: 'Rogue',   ch: 'NinjaMasked',   rank: ['A','Opus 5.5'],   sta: 41 },
+  { cls: 'Monk',    ch: 'Monk',          rank: ['C','Haiku 5.5'],  sta: 90 },
+  { cls: 'Samurai', ch: 'Samurai',       rank: ['S','Fable 5.1'],  sta: 15 },
+];
+// frame sizes read from the PNGs
+const MONSTERS = {
+  forest:   { id: 'GiantRacoon',     name: 'Giant Racoon',  idle: ['Idle.png', 60, 6],       hit: ['Attack.png', 60, 4] },
+  desert:   { id: 'DemonCyclop',     name: 'Demon Cyclops', idle: ['Idle.png', 50, 5],       hit: ['Hit.png', 50, 3] },
+  dungeon:  { id: 'GiantSpirit',     name: 'Giant Spirit',  idle: ['Idle.png', 50, 5],       hit: ['Hit.png', 50, 3] },
+  field:    { id: 'TenguBlue',       name: 'Blue Tengu',    idle: ['Idle.png', 68, 6],       hit: ['Hit.png', 68, 8] },
+  ruins:    { id: 'GiantRedSamurai', name: 'Red Warlord',   idle: ['Idle.png', 48, 12],      hit: ['Hit.png', 48, 8] },
+  lakeside: { id: 'GiantFrog',       name: 'Giant Frog',    idle: ['Idle40x40.png', 40, 5],  hit: ['Hit.png', 40, 3] },
+};
+const MAPS = ['forest','desert','dungeon','field','ruins','lakeside'];
+const cap = s => s[0].toUpperCase() + s.slice(1);
+
+const FONTS = [
+  { f: 'Pixelify Sans', size: 15, note: 'current pick' },
+  { f: 'Silkscreen',    size: 13, note: 'caps-heavy, tiny' },
+  { f: 'VT323',         size: 19, note: 'terminal feel' },
+  { f: 'Jersey 10',     size: 19, note: 'condensed, arcade' },
+  { f: 'Tiny5',         size: 15, note: 'small 5px grid' },
+  { f: 'Micro 5',       size: 21, note: 'very condensed' },
+  { f: 'DotGothic16',   size: 14, note: 'Japanese RPG menus' },
+  { f: 'Handjet',       size: 17, note: 'LED/dot, variable' },
+  { f: 'Press Start 2P',size: 10, note: 'logo only' },
+  { f: 'system-ui',     size: 14, note: 'non-pixel baseline' },
+];
+
+/* ---------- sprite helpers ---------- */
+const ch = (c, file) => `${NA}/chars/${c}/${file}`;
+// one frame from a hunter sheet. dir: 0 down, 1 up, 2 left, 3 right
+function hunterEl(c, s = 3) {
+  const el = document.createElement('div');
+  el.className = 'spr'; el.style.width = el.style.height = 16*s + 'px';
+  el.dataset.ch = c; el.dataset.s = s;
+  return el;
+}
+function setHunter(el, state) {
+  const c = el.dataset.ch, s = +el.dataset.s;
+  el.getAnimations().forEach(a => a.cancel());
+  el.querySelectorAll('.bang,.zz').forEach(n => n.remove());
+  const frame = (file, col = 3, w = 64) => {
+    el.style.backgroundImage = `url(${ch(c, file)})`;
+    el.style.backgroundSize = `${w*s}px ${16*s}px`;
+    el.style.backgroundPosition = `${-col*16*s}px 0`;
+  };
+  if (state === 'hunting') {
+    frame('Idle.png');
+    el.animate([
+      { backgroundImage: `url(${ch(c,'Idle.png')})`, transform: 'translateX(0)' },
+      { backgroundImage: `url(${ch(c,'Attack.png')})`, transform: 'translateX(6px)' },
+    ], { duration: 520, iterations: Infinity, easing: 'steps(1, end)', direction: 'alternate' });
+  } else if (state === 'help') {
+    frame('Item.png', 0, 16);
+    el.insertAdjacentHTML('beforeend', '<span class="bang">!</span>');
+  } else if (state === 'cleared') {
+    frame('Idle.png');
+    el.animate([{transform:'translateY(0)'},{transform:'translateY(0)', offset:.7},{transform:'translateY(-12px)', offset:.8},{transform:'translateY(0)'}],
+      { duration: 2400, iterations: Infinity, easing: 'steps(6, end)' });
+  } else {
+    frame('Idle.png');
+    el.insertAdjacentHTML('beforeend', '<span class="zz">z</span>');
+  }
+}
+function monsterEl(map, s = 2) {
+  const m = MONSTERS[map], fw = m.idle[1];
+  const el = document.createElement('div');
+  el.className = 'spr'; el.style.width = el.style.height = fw*s + 'px';
+  el.dataset.map = map; el.dataset.s = s;
+  return el;
+}
+function setMonster(el, mode) {
+  const m = MONSTERS[el.dataset.map], s = +el.dataset.s;
+  el.getAnimations().forEach(a => a.cancel());
+  el.classList.toggle('slain', mode === 'slain');
+  const [file, fw, n] = mode === 'hit' ? m.hit : m.idle;
+  el.style.backgroundImage = `url(${NA}/boss/${m.id}/${file})`;
+  el.style.backgroundSize = `${fw*n*s}px ${fw*s}px`;
+  el.animate([{ backgroundPosition: '0 0' }, { backgroundPosition: `${-fw*n*s}px 0` }],
+    { duration: (mode === 'hit' ? 90 : 160) * n, iterations: mode === 'slain' ? 1 : Infinity, easing: `steps(${n})`, fill: 'forwards' });
+  if (mode === 'hit') el.animate([{transform:'translateX(0)'},{transform:'translateX(-2px)'},{transform:'translateX(2px)'},{transform:'translateX(0)'}],
+    { duration: 300, iterations: Infinity, easing: 'steps(4)', composite: 'add' });
+}
+const face = c => `background-image:url(${ch(c,'Faceset.png')})`;
+const mface = map => `background-image:url(${NA}/boss/${MONSTERS[map].id}/Faceset.png)`;
+
+/* ---------- state model ---------- */
+const ST = {
+  hunting: { label: '⚔ Hunting',    color: 'var(--hunting)' },
+  help:    { label: '! Needs help', color: 'var(--help)' },
+  cleared: { label: '✓ Cleared',    color: 'var(--cleared)' },
+  resting: { label: 'z Resting',    color: 'var(--dim)' },
+};
+const PRESETS = {
+  mixed:   ['hunting','help','cleared','resting'],
+  hunting: ['hunting','hunting','hunting','hunting'],
+  help:    ['help','hunting','hunting','resting'],
+  cleared: ['cleared','cleared','cleared','resting'],
+  resting: ['resting','resting','resting','resting'],
+};
+let preset = 'mixed';
+let focusIdx = 0;
+const party = [HUNTERS[0], HUNTERS[1], HUNTERS[3], HUNTERS[4]]; // Knight, Mage, Rogue, Monk in shop-api
+const states = () => PRESETS[preset];
+function monsterMode(sts) {
+  if (sts.includes('hunting') || sts.includes('help') && sts.includes('hunting')) return 'hit';
+  if (!sts.includes('hunting') && sts.includes('cleared')) return 'slain';
+  return 'idle';
+}
+const staColor = v => v == null ? 'var(--dim)' : v < 20 ? 'var(--help)' : v < 50 ? 'var(--text)' : 'var(--hunting)';
+
+/* ---------- arena ---------- */
+function buildArena(map, members, sts, mode) {
+  const a = document.createElement('div');
+  a.className = 'arena px';
+  a.style.backgroundImage = `url(${ARENA(map)})`;
+  const pos = [[44,52],[92,70],[40,104],[88,122]];
+  members.slice(0,4).forEach((h, i) => {
+    const w = document.createElement('div'); w.className = 'who';
+    w.style.left = pos[i][0]+'px'; w.style.top = pos[i][1]+'px';
+    const e = hunterEl(h.ch, 2); w.appendChild(e); a.appendChild(w);
+    setHunter(e, sts[i]);
+  });
+  const mw = document.createElement('div'); mw.className = 'who';
+  const fw = MONSTERS[map].idle[1]*2;
+  mw.style.left = (236 - fw/2) + 'px'; mw.style.top = (128 - fw) + 'px';
+  const me = monsterEl(map, 2); mw.appendChild(me); a.appendChild(mw);
+  setMonster(me, mode);
+  const hp = mode === 'slain' ? 0 : mode === 'hit' ? 58 : 100;
+  a.insertAdjacentHTML('beforeend', `<div class="mapname">${cap(map)} · ${MONSTERS[map].name}</div>
+    <div class="hpwrap"><div class="bar"><i style="width:${hp}%;background:var(--hp)"></i></div>${mode==='slain'?'SLAIN':'HP'}</div>`);
+  return a;
+}
+
+/* ---------- herdr window ---------- */
+function memberRow(h, st, i, extra = '') {
+  const s = ST[st];
+  const sta = h.sta == null ? `<span style="margin-left:auto">STA —</span>`
+    : `<span class="bar sta"><i style="width:${h.sta}%;background:${staColor(h.sta)}"></i></span>`;
+  return `<div class="mem ${st==='help'?'help':''}" data-i="${i}">
+    <div class="face px" style="${face(h.ch)}"></div>
+    <div class="l1"><span class="cls">${h.cls}</span><span class="st" style="color:${s.color}">${s.label}</span></div>
+    <div class="l2"><span class="grade ${h.rank[0]==='?'?'unk':''}">${h.rank[0]}</span>${h.rank[1]}${extra}${sta}</div>
+  </div>`;
+}
+function worst(sts) { return ['help','hunting','cleared','resting'].find(x => sts.includes(x)); }
+
+function renderWindow() {
+  const sts = states(), mode = monsterMode(sts);
+  const win = document.getElementById('win');
+  win.innerHTML = `
+  <aside class="side">
+    <div class="side-top"><span class="lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></span><span class="logo">PIXEL HUNTER</span><span class="gear">⚙</span></div>
+    <div id="arenaSlot"></div>
+    <div class="areas">
+      <div class="area current">
+        <div class="arow"><span class="chev">▾</span><span class="mface px" style="${mface('forest')}"></span><span class="name">shop-api</span><span class="map">· Forest</span><span class="sp"></span><span class="dot" style="background:${ST[worst(sts)].color}"></span><span class="bar hpm"><i style="width:${mode==='slain'?0:mode==='hit'?58:100}%;background:var(--hp)"></i></span><span class="key">⌃1</span></div>
+        <div class="apath">~/code/shop-api · <b>feat/login</b></div>
+        ${party.map((h,i) => memberRow(h, sts[i], i, i===1 ? ' · ⎇ fix/cart' : '')).join('')}
+      </div>
+      <div class="area">
+        <div class="arow"><span class="chev">▸</span><span class="mface px" style="${mface('desert')}"></span><span class="name">herdr-monster-hunter</span><span class="map">· Desert</span><span class="sp"></span><span class="dot" style="background:var(--cleared)"></span><span class="bar hpm"><i style="width:0%"></i></span><span class="key">⌃2</span></div>
+        <div class="apath">~/Documents/code/personal/herdr-monster-hunter · <b>main</b></div>
+      </div>
+      <div class="area">
+        <div class="arow"><span class="chev">▾</span><span class="mface px" style="${mface('dungeon')}"></span><span class="name">Login fix</span><span class="map">· Dungeon</span><span class="sp"></span><span class="dot" style="background:var(--hunting)"></span><span class="bar hpm"><i style="width:80%;background:var(--hp)"></i></span><span class="key">⌃3</span></div>
+        <div class="apath">~/code/auth-service · <b>fix/session</b></div>
+        ${memberRow(HUNTERS[5], 'hunting', 9)}
+      </div>
+      <div class="area">
+        <div class="arow"><span class="chev">▸</span><span class="mface px" style="${mface('field')}"></span><span class="name">dotfiles</span><span class="map">· Field</span><span class="sp"></span><span class="dot" style="background:var(--dim)"></span><span class="bar hpm"><i style="width:100%;background:var(--hp)"></i></span><span class="key">⌃4</span></div>
+        <div class="apath">~/dotfiles · <b>main</b></div>
+      </div>
+    </div>
+  </aside>
+  <section class="work">
+    <div class="tabs">
+      <div class="tab on"><span class="head px" style="${face('Knight')}"></span>login<span class="dot" style="background:${ST[sts[0]].color}"></span></div>
+      <div class="tab"><span class="head px" style="${face('SorcererBlack')}"></span>cart<span class="dot" style="background:${ST[sts[1]].color}"></span></div>
+      <div class="tab"><span class="head px" style="${face('NinjaMasked')}"></span>tests<span class="dot" style="background:${ST[sts[2]].color}"></span></div>
+      <div class="tab plus">+</div>
+      <span class="sp"></span>
+      <span class="tbtn" title="Files">▤</span><span class="tbtn" title="Changes">±</span>
+    </div>
+    <div class="panes">
+      ${pane(0, party[0], sts[0], '~/code/shop-api', 'feat/login', TERM_A)}
+      ${pane(1, party[1], sts[1], '~/code/shop-api-cart', 'fix/cart', sts[1]==='help' ? TERM_B_HELP : TERM_B)}
+    </div>
+  </section>`;
+  document.getElementById('arenaSlot').replaceWith(buildArena('forest', party, sts, mode));
+  win.querySelectorAll('.mem').forEach(m => m.addEventListener('click', () => { focusIdx = +m.dataset.i === 1 ? 1 : 0; renderWindow(); }));
+}
+function pane(i, h, st, path, br, body) {
+  const cls = ['pane', st === 'help' ? 'help' : focusIdx === i ? 'focus' : ''].join(' ');
+  return `<div class="${cls}">
+    <div class="phead"><span class="head px" style="${face(h.ch)}"></span><b>${h.cls}</b><span class="grade">${h.rank[0]}</span><span>${h.rank[1]}</span><span class="dimt">${path} · ${br}</span><span class="sp"></span><span class="st" style="color:${ST[st].color}">${ST[st].label}</span></div>
+    <div class="term">${body}</div>
+  </div>`;
+}
+const TERM_A = `<span class="c4">$</span> claude
+<span class="c1">●</span> Reading src/auth/session.ts
+<span class="c1">●</span> Reading src/auth/login.tsx
+<span class="c2">✓</span> Found the bug: the token refresh runs
+  before the cookie is written.
+<span class="c1">●</span> Editing src/auth/session.ts
+  <span class="c2">+  await writeCookie(res, token)</span>
+  <span class="c3">-  scheduleRefresh(token)</span>
+<span class="c1">●</span> Running pnpm test auth
+  <span class="c4">PASS  auth/session.test.ts (14)</span>
+  <span class="c4">PASS  auth/login.test.ts (9)</span>
+<span class="c1">✻</span> Thinking…`;
+const TERM_B = `<span class="c4">$</span> claude
+<span class="c1">●</span> Reading src/cart/total.ts
+<span class="c1">●</span> Searching for "applyDiscount"
+<span class="c2">✓</span> 3 call sites found
+<span class="c1">✻</span> Working…`;
+const TERM_B_HELP = TERM_B.replace('<span class="c1">✻</span> Working…', '') +
+`<span class="box">Edit file <b>src/cart/total.ts</b>?
+  ❯ 1. Yes
+    2. Yes, and don't ask again this session
+    3. No, tell Claude what to do differently</span>`;
+
+/* ---------- galleries ---------- */
+function renderGalleries() {
+  const sts = states();
+  const hs = document.getElementById('hunters'); hs.innerHTML = '';
+  HUNTERS.forEach((h, i) => {
+    const st = sts[i % 4];
+    const g = document.createElement('div'); g.className = 'g card';
+    g.innerHTML = `<div class="stage"></div><div class="faces"><span class="px" style="${face(h.ch)}"></span><span class="nm">${h.cls}</span></div>
+      <div class="meta">${h.ch} · <span style="color:${ST[st].color}">${ST[st].label}</span></div>`;
+    const e = hunterEl(h.ch, 3); g.querySelector('.stage').appendChild(e); setHunter(e, st);
+    hs.appendChild(g);
+  });
+  const mode = monsterMode(sts);
+  const ms = document.getElementById('monsters'); ms.innerHTML = '';
+  MAPS.forEach(map => {
+    const m = MONSTERS[map];
+    const g = document.createElement('div'); g.className = 'g card';
+    g.innerHTML = `<div class="stage" style="height:160px"></div><div class="faces"><span class="px" style="${mface(map)}"></span><span class="nm">${m.name}</span></div>
+      <div class="meta">${m.id} · ${m.idle[1]}px · lives in ${cap(map)}</div>`;
+    const e = monsterEl(map, 2); g.querySelector('.stage').appendChild(e); setMonster(e, mode);
+    ms.appendChild(g);
+  });
+  const as = document.getElementById('areas'); as.innerHTML = '';
+  MAPS.forEach((map, k) => {
+    const members = [HUNTERS[k % 6], HUNTERS[(k+2) % 6]];
+    const g = document.createElement('div'); g.className = 'ag card';
+    g.appendChild(buildArena(map, members, [sts[0], sts[1]], monsterMode([sts[0], sts[1]])));
+    g.insertAdjacentHTML('beforeend', `<div class="cap"><b>${cap(map)}</b><span>Area ${k+1}${k===5?' · then cycles back to Forest':''}</span></div>`);
+    as.appendChild(g);
+  });
+}
+
+/* ---------- fonts ---------- */
+function renderFonts() {
+  const box = document.getElementById('fonts');
+  FONTS.forEach((F, i) => {
+    const b = document.createElement('button');
+    b.className = 'font card'; b.setAttribute('aria-pressed', i === 0);
+    b.innerHTML = `<div class="fname"><span>${F.f}</span><span>${F.size}px · ${F.note}</span></div>
+      <div style="font-family:'${F.f}',system-ui;font-size:${F.size}px;line-height:1.5">
+        <div class="s1">shop-api · Forest</div>
+        <div class="s2">~/code/shop-api · feat/login</div>
+        <div class="s3"><b style="color:var(--hunting)">⚔ HUNTING</b><b style="color:var(--help)">! NEEDS HELP</b></div>
+        <div class="s3"><span class="grade">A</span>Opus 5.5 · Knight · STA 64%</div>
+      </div>`;
+    b.addEventListener('click', () => {
+      box.querySelectorAll('.font').forEach(x => x.setAttribute('aria-pressed', x === b));
+      document.documentElement.style.setProperty('--ui-font', `'${F.f}'`);
+      document.documentElement.style.setProperty('--ui-size', F.size + 'px');
+      document.getElementById('curFont').textContent = F.f;
+    });
+    box.appendChild(b);
+  });
+}
+
+document.querySelectorAll('#stateBar [data-st]').forEach(b => b.addEventListener('click', () => {
+  preset = b.dataset.st;
+  document.querySelectorAll('#stateBar [data-st]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  renderWindow(); renderGalleries();
+}));
+renderFonts(); renderWindow(); renderGalleries();
+</script>
+</body>
+</html>

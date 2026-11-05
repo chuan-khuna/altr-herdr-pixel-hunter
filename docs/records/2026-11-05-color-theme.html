@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pixel-hunter colors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* ---------- pixel-hunter-night tokens (proposal) ---------- */
+  :root {
+    /* environment ramp: cool, desaturated, hue-shifted (no neutral gray) */
+    /* signal + text colors are taken from Lospec palettes (Vinik24, Chasm,
+       Cryptic Ocean). The palettes have no near-black blue-cyan, so the dark
+       ramp is Vinik24 #387080 (hue ~200deg) darkened, low saturation. */
+    --canvas:   #101a24;
+    --chrome:   #15222e;
+    --surface:  #192a38;
+    --selected: #1c2f40;
+    --border:   #2e475b;
+    --dim:      #7e9e99;   /* Vinik24: grey teal */
+    --text:     #c5ccb8;   /* Vinik24: sage cream, not white */
+
+    /* character / signal colors: the saturation budget */
+    --accent:   #95c5ac;   /* Cryptic Ocean: focus frame, rank grade */
+    --hunting:  #7ca1c0;   /* Vinik24: cool, busy, nothing to do */
+    --help:     #f3a787;   /* Chasm: warmest + brightest signal, needs you */
+    --cleared:  #6eaa78;   /* Vinik24: done, look when you like */
+    --hp:       #c38890;   /* Vinik24: monster only */
+    --resting:  var(--dim);
+
+    --px: 2px;             /* one art pixel at 2x */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--canvas);
+    color: var(--text);
+    font: 16px/1.5 "Pixelify Sans", system-ui, sans-serif;
+    padding: 32px 16px 64px;
+  }
+  main { max-width: 1040px; margin: 0 auto; }
+  /* Press Start 2P only for the logo; everything else is Pixelify Sans */
+  .logo { font-family: "Press Start 2P", monospace; font-weight: 400; letter-spacing: 0; }
+  h2, .label, .grade, .state { font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  h1 { font-size: 20px; line-height: 1.6; margin: 0 0 8px; }
+  h2 { font-size: 17px; line-height: 1.4; margin: 48px 0 16px; color: var(--accent); }
+  p.lede { color: var(--dim); max-width: 70ch; margin: 0 0 8px; }
+  a { color: var(--hunting); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; color: var(--text); background: var(--surface); padding: 1px 5px; }
+
+  .frame {
+    background: var(--chrome);
+    border: var(--px) solid var(--border);
+    box-shadow: 4px 4px 0 0 #0a1219;
+  }
+
+  /* ---------- principles ---------- */
+  .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .rule { padding: 16px; }
+  .rule .label { font-size: 13px; color: var(--accent); display: block; margin-bottom: 8px; }
+  .rule h3 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+  .rule p { margin: 0 0 8px; color: var(--dim); }
+  .rule p.apply { color: var(--text); margin: 0; }
+  .rule p.apply::before { content: "→ "; color: var(--accent); }
+
+  /* ---------- palette ---------- */
+  .ramp { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .ramp div { height: 72px; padding: 6px; font-size: 12px; display: flex; flex-direction: column; justify-content: flex-end; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 16px; }
+  .sw { padding: 12px; }
+  .sw .chip { height: 40px; border: var(--px) solid var(--border); margin-bottom: 8px; display:flex; align-items:center; justify-content:center; font-weight: 600; font-size: 20px; color: var(--canvas); }
+  .sw b { display: block; font-weight: 600; }
+  .sw small { color: var(--dim); display: block; }
+  .sw .cr { font-size: 12px; color: var(--dim); }
+  .cr .ok { color: var(--cleared); }
+  .cr .bad { color: var(--hp); }
+
+  /* ---------- mock ---------- */
+  .mock-wrap { display: grid; grid-template-columns: 336px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 760px) { .mock-wrap { grid-template-columns: 1fr; } .ramp div { font-size: 10px; } }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  button {
+    font: 600 14px "Pixelify Sans", system-ui, sans-serif; color: var(--text);
+    background: var(--surface); border: var(--px) solid var(--border);
+    padding: 8px 10px; cursor: pointer;
+  }
+  button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  .gray { filter: grayscale(1); }
+  .blur { filter: blur(3px); }
+  .gray.blur { filter: grayscale(1) blur(3px); }
+
+  .sidebar { width: 100%; max-width: 336px; }
+  .sb-head { display:flex; justify-content:space-between; align-items:center; padding: 12px; border-bottom: var(--px) solid var(--border); }
+  .sb-head .logo { font-size: 11px; color: var(--text); }
+  .scene {
+    position: relative; height: 176px; overflow: hidden;
+    border-bottom: var(--px) solid var(--border);
+    /* desaturated "forest" floor: environment stays quiet */
+    background:
+      repeating-linear-gradient(90deg, transparent 0 14px, rgba(0,0,0,.12) 14px 16px),
+      repeating-linear-gradient(0deg, transparent 0 14px, rgba(0,0,0,.12) 14px 16px),
+      linear-gradient(#2e3a40, #262f38);
+  }
+  .tree { position:absolute; width: 24px; height: 24px; background: #3a4c4a; border: var(--px) solid #2c3a3c; }
+  .sprite { position: absolute; width: 32px; height: 32px; image-rendering: pixelated; }
+  .sprite svg { width: 100%; height: 100%; display:block; shape-rendering: crispEdges; }
+  .bang { position:absolute; top:-20px; left: 12px; font: 600 18px "Pixelify Sans", sans-serif; color: var(--help); animation: blink 0.8s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .monster { width: 64px; height: 64px; right: 28px; top: 52px; }
+  .hpbar { position:absolute; right: 16px; top: 128px; width: 92px; }
+  .bar { height: 8px; background: var(--canvas); border: var(--px) solid var(--border); position: relative; }
+  .bar i { position:absolute; inset: 0 auto 0 0; }
+  .tiny { font-size: 13px; color: var(--dim); }
+  .more { position:absolute; left: 88px; top: 128px; font: 600 14px "Pixelify Sans", sans-serif; color: var(--dim); }
+
+  .area { border-bottom: var(--px) solid var(--border); padding: 10px 12px; }
+  .area.current { background: var(--selected); }
+  .area-row { display:flex; align-items:center; gap: 8px; }
+  .area-row .name { font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .area-row .map, .area-row .key, .area-row .dot, .area-row .hp-mini { flex-shrink: 0; }
+  .area-row .map { color: var(--dim); }
+  .area-row .sp { flex: 1; }
+  .area-row .key { color: var(--dim); font-size: 12px; }
+  .area-row .hp-mini { width: 40px; }
+  .dot { width: 8px; height: 8px; display:inline-block; }
+  .path { color: var(--dim); font-size: 13px; margin: 2px 0 6px 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .path .br { color: var(--text); }
+  .member { margin: 6px 0 0 18px; padding: 6px 8px; border: var(--px) solid transparent; display: grid; grid-template-columns: 28px 1fr; gap: 2px 8px; }
+  .member.help { border-color: var(--help); background: rgba(243,167,135,.07); }
+  .member .face { grid-row: span 2; width: 28px; height: 28px; }
+  .member .face svg { width:100%; height:100%; shape-rendering: crispEdges; }
+  .m1 { display:flex; gap: 8px; align-items: baseline; }
+  .m1 .cls { font-weight: 600; }
+  .state { font-size: 13px; }
+  .m2 { display:flex; gap: 8px; align-items:center; font-size: 14px; color: var(--dim); }
+  .grade { font-size: 13px; line-height: 1; color: var(--canvas); background: var(--accent); padding: 2px 5px; }
+  .grade.unk { background: var(--dim); }
+  .sta { width: 54px; margin-left: auto; }
+  .chev { color: var(--dim); width: 10px; display:inline-block; }
+
+  .notes { padding: 16px; }
+  .notes ul { margin: 0; padding-left: 18px; color: var(--dim); }
+  .notes li { margin-bottom: 8px; }
+  .notes li b { color: var(--text); font-weight: 600; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: var(--px) solid var(--border); vertical-align: top; }
+  th { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dim); }
+  .tbl { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="logo">pixel-hunter-night</h1>
+  <p class="lede">Proposed color principles and a faded blue-cyan palette for the pixel-hunter Herdr layout. Text and signal colors come from Lospec palettes (<a href="https://lospec.com/palette-list/vinik24">Vinik24</a>, <a href="https://lospec.com/palette-list/chasm">Chasm</a>, <a href="https://lospec.com/palette-list/cryptic-ocean">Cryptic Ocean</a>; mood reference <a href="https://lospec.com/palette-list/eulbink">Eulbink</a>). Those palettes have no near-black blue-cyan, so the dark ramp is Vinik24's <code>#387080</code> darkened.</p>
+  <p class="lede">The principles are adapted from Valve's published art direction: the illustrative-rendering approach in <i>Team Fortress 2</i> (Mitchell, Francke &amp; Eng, NPAR 2007) and the readability rules in the Dota 2 character art guide. Valve wrote them for 3D characters in busy scenes. Here they are applied to a sidebar full of agents.</p>
+  <p class="lede">Record of design question Q23, 2026-11-05. Status: proposal.</p>
+
+  <h2>Principles</h2>
+  <div class="principles">
+    <div class="rule frame">
+      <span class="label">01 · READ ORDER</span>
+      <h3>Silhouette, then value, then hue, then detail</h3>
+      <p>Valve designs characters so you can tell them apart by shape alone, then by light and dark. Hue comes third, and texture is last.</p>
+      <p class="apply">Each hunt state has a shape as well as a color (<code>⚔</code> <code>!</code> <code>✓</code> <code>z</code>, a frame around Needs help). Turn on <b>Grayscale</b> below: the states still read.</p>
+    </div>
+    <div class="rule frame">
+      <span class="label">02 · QUIET WORLD</span>
+      <h3>The environment is muted so characters pop</h3>
+      <p>TF2 keeps backgrounds low in saturation and contrast, with soft detail, and saves the strong colors for the players.</p>
+      <p class="apply">Chrome, surfaces and the arena floor are low-chroma purple-navy and dark green. Strong color appears only on Hunters, the Monster and status signals.</p>
+    </div>
+    <div class="rule frame">
+      <span class="label">03 · SATURATION BUDGET</span>
+      <h3>The brightest thing is the most important thing</h3>
+      <p>The Dota guide puts the highest value and saturation at the focal point and keeps the rest quieter.</p>
+      <p class="apply">Needs help <code>#f3a787</code> (peach) is the lightest, warmest signal, because a hunter waiting on you is the one thing you must not miss. Its row also gets a frame and a blinking <code>!</code>. Cleared and Hunting are a step below it. Resting gets no color at all.</p>
+    </div>
+    <div class="rule frame">
+      <span class="label">04 · WARM vs COOL</span>
+      <h3>Warm advances, cool recedes</h3>
+      <p>TF2 shades in warm and cool, with warm light on characters and cool shadow in the environment, to separate figure from ground.</p>
+      <p class="apply">Only two colors are warm, and both want you: Needs help (peach) and Monster HP (dusty rose). Everything else is cool: Hunting (faded blue), Cleared (faded green), focus and rank (mint), and the whole environment ramp.</p>
+    </div>
+    <div class="rule frame">
+      <span class="label">05 · HUE-SHIFTED RAMPS</span>
+      <h3>Shadows are never neutral gray</h3>
+      <p>Valve's lighting tints shadows instead of darkening toward black. Pixel art does the same with hue-shifted ramps.</p>
+      <p class="apply">The 7-step ramp runs from deep blue-cyan slate to sage-cream text. No <code>#000</code>, no <code>#fff</code>, no <code>#888</code>. Text is about 9:1 on the chrome, not 15:1, so it reads clearly without glare.</p>
+    </div>
+    <div class="rule frame">
+      <span class="label">06 · TEAM COLORS</span>
+      <h3>Few signal hues, never reused</h3>
+      <p>TF2 has two team colors, and they are never used for anything else.</p>
+      <p class="apply">Each signal hue has one meaning. Rose is only Monster HP, never an error or a branch. Mint is only focus and rank. Status hues never decorate.</p>
+    </div>
+  </div>
+
+  <h2>Environment ramp (dark → light)</h2>
+  <div class="frame">
+    <div class="ramp" id="ramp"></div>
+  </div>
+
+  <h2>Signal colors</h2>
+  <div class="swatches" id="swatches"></div>
+
+  <h2>Mock: sidebar</h2>
+  <div class="toolbar">
+    <button id="tGray" aria-pressed="false">Grayscale (value check)</button>
+    <button id="tBlur" aria-pressed="false">Squint (blur)</button>
+  </div>
+  <div class="mock-wrap">
+    <div id="mock" class="sidebar frame">
+      <div class="sb-head"><span class="logo">PIXEL HUNTER</span><span class="tiny">⚙</span></div>
+      <div class="scene" aria-label="Forest arena">
+        <div class="tree" style="left:8px;top:8px"></div>
+        <div class="tree" style="left:148px;top:12px"></div>
+        <div class="tree" style="left:280px;top:146px"></div>
+        <div class="tree" style="left:12px;top:144px"></div>
+        <div class="sprite" style="left:40px;top:44px" data-h="knight"></div>
+        <div class="sprite" style="left:84px;top:62px" data-h="mage"><span class="bang">!</span></div>
+        <div class="sprite" style="left:44px;top:92px" data-h="rogue"></div>
+        <div class="sprite monster" data-h="beast"></div>
+        <div class="more">+1</div>
+        <div class="hpbar"><div class="bar"><i style="width:58%;background:var(--hp)"></i></div><div class="tiny" style="text-align:right">HP</div></div>
+      </div>
+
+      <div class="area current">
+        <div class="area-row"><span class="chev">▾</span><span class="name">shop-api</span><span class="map">· Forest</span><span class="sp"></span><span class="dot" style="background:var(--help)"></span><span class="bar hp-mini"><i style="width:58%;background:var(--hp)"></i></span><span class="key">⌃1</span></div>
+        <div class="path">~/code/shop-api · <span class="br">feat/login</span></div>
+        <div class="member" data-face="knight">
+          <div class="face"></div>
+          <div class="m1"><span class="cls">Knight</span><span class="state" style="color:var(--hunting)">⚔ HUNTING</span></div>
+          <div class="m2"><span class="grade">A</span>Opus 5.5<span class="bar sta"><i style="width:72%;background:var(--hunting)"></i></span></div>
+        </div>
+        <div class="member help" data-face="mage">
+          <div class="face"></div>
+          <div class="m1"><span class="cls">Mage</span><span class="state" style="color:var(--help)">! NEEDS HELP</span></div>
+          <div class="m2"><span class="grade">B</span>Sonnet 5.5 · ⎇ fix/cart<span class="bar sta"><i style="width:24%;background:var(--hunting)"></i></span></div>
+        </div>
+        <div class="member" data-face="rogue">
+          <div class="face"></div>
+          <div class="m1"><span class="cls">Rogue</span><span class="state" style="color:var(--cleared)">✓ CLEARED</span></div>
+          <div class="m2"><span class="grade unk">?</span>codex<span class="tiny" style="margin-left:auto">STA —</span></div>
+        </div>
+        <div class="member" data-face="monk">
+          <div class="face"></div>
+          <div class="m1"><span class="cls">Monk</span><span class="state" style="color:var(--resting)">z RESTING</span></div>
+          <div class="m2"><span class="grade">C</span>Haiku 5.5<span class="bar sta"><i style="width:90%;background:var(--hunting)"></i></span></div>
+        </div>
+      </div>
+
+      <div class="area">
+        <div class="area-row"><span class="chev">▸</span><span class="name">herdr-monster-hunter</span><span class="map">· Desert</span><span class="sp"></span><span class="dot" style="background:var(--cleared)"></span><span class="bar hp-mini"><i style="width:0%"></i></span><span class="key">⌃2</span></div>
+        <div class="path">~/Documents/code/personal/herdr-monster-hunter · <span class="br">main</span></div>
+      </div>
+      <div class="area">
+        <div class="area-row"><span class="chev">▸</span><span class="name">Login fix</span><span class="map">· Dungeon</span><span class="sp"></span><span class="dot" style="background:var(--hunting)"></span><span class="bar hp-mini"><i style="width:85%;background:var(--hp)"></i></span><span class="key">⌃3</span></div>
+        <div class="path">~/code/auth-service · <span class="br">fix/session</span></div>
+      </div>
+    </div>
+
+    <div class="notes frame">
+      <ul>
+        <li><b>Find the peach first.</b> With the squint toggle on, the Needs-help frame and the <code>!</code> should still be the first thing you see (principle 03).</li>
+        <li><b>Area names.</b> Line one is the Herdr space name, which is the repo name unless you renamed the space (see "Login fix"). Line two always shows the real path and branch. A name too long for the row ends in <code>…</code>.</li>
+        <li><b>Grayscale check.</b> Every state stays distinct by icon and label even with hue removed. Hunting and Cleared are close in value, so their glyphs (<code>⚔</code> / <code>✓</code>) carry the difference (principle 01).</li>
+        <li><b>The arena floor</b> is a dim, low-chroma green. The sprites (shown as placeholders here) are the only saturated pixels in the scene (principle 02).</li>
+        <li><b>The rose HP bar</b> is the only rose on screen. A collapsed Area shows its HP bar and one state dot (the worst state among its hunters: help &gt; hunting &gt; cleared).</li>
+        <li><b>Sprites here are stand-ins.</b> The real ones come from Ninja Adventure (CC0) at 16×16, drawn at 2×.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Token table</h2>
+  <div class="tbl frame">
+    <table id="tokens">
+      <thead><tr><th>TOKEN</th><th>HEX</th><th>ROLE</th><th>CONTRAST ON CHROME</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+  const css = getComputedStyle(document.documentElement);
+  const v = n => css.getPropertyValue('--' + n).trim();
+
+  // WCAG relative luminance + contrast ratio
+  const lum = hex => {
+    const c = hex.replace('#','').match(/../g).map(h => parseInt(h,16)/255)
+      .map(x => x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4));
+    return 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
+  };
+  const ratio = (a,b) => { const [x,y] = [lum(a),lum(b)].sort((p,q)=>q-p); return (x+0.05)/(y+0.05); };
+
+  const env = [
+    ['canvas','window background, terminals'],
+    ['chrome','sidebar, tab bar'],
+    ['surface','pane headers, inputs'],
+    ['selected','current Area, current tab'],
+    ['border','2px pixel frames, radius 0'],
+    ['dim','paths, secondary text, Resting'],
+    ['text','primary text'],
+  ];
+  const sig = [
+    ['accent','Focus frame, rank grade','★'],
+    ['hunting','Hunting · Stamina bar','⚔'],
+    ['help','Needs help','!'],
+    ['cleared','Cleared','✓'],
+    ['hp','Monster HP only','♥'],
+  ];
+
+  const ramp = document.getElementById('ramp');
+  env.forEach(([n]) => {
+    const d = document.createElement('div');
+    const hex = v(n);
+    d.style.background = hex;
+    d.style.color = lum(hex) > 0.3 ? v('canvas') : v('text');
+    d.innerHTML = `<span>${n}</span><span>${hex}</span>`;
+    ramp.appendChild(d);
+  });
+
+  const sw = document.getElementById('swatches');
+  const chrome = v('chrome');
+  sig.forEach(([n, role, glyph]) => {
+    const hex = v(n), r = ratio(hex, chrome);
+    const el = document.createElement('div');
+    el.className = 'sw frame';
+    el.innerHTML = `<div class="chip" style="background:${hex}">${glyph}</div>
+      <b>${n}</b><small>${hex} · ${role}</small>
+      <span class="cr">on chrome <span class="${r>=4.5?'ok':'bad'}">${r.toFixed(1)}:1</span></span>`;
+    sw.appendChild(el);
+  });
+
+  const tb = document.querySelector('#tokens tbody');
+  [...env, ...sig].forEach(([n, role]) => {
+    const hex = v(n), r = ratio(hex, chrome);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><code>${n}</code></td>
+      <td><span class="dot" style="background:${hex};border:2px solid var(--border);width:14px;height:14px;vertical-align:-2px"></span> ${hex}</td>
+      <td>${role}</td>
+      <td>${['canvas','chrome','surface','selected','border'].includes(n) ? '<span class="tiny">background</span>' : r.toFixed(1)+':1'}</td>`;
+    tb.appendChild(tr);
+  });
+
+  // ---------- placeholder pixel sprites (8x8 grids, drawn as rects) ----------
+  const P = {
+    knight: { pal: {a:'#c9d1e0', b:'#7a86a3', c:'#f0c9a0', d:'#3a4a7a'}, g: [
+      '..aaaa..','.abbbba.','.acccca.','..cddc..','.aaaaaa.','a.addaa.','..a..a..','.bb..bb.'] },
+    mage:   { pal: {a:'#9b5de5', b:'#6a3fb0', c:'#f0c9a0', d:'#ffd23f'}, g: [
+      '...aa...','..aaaa..','.bbbbbb.','..cccc..','.aaaaaa.','d.aaaa..','..a..a..','.bb..bb.'] },
+    rogue:  { pal: {a:'#3b4252', b:'#2a2f3a', c:'#f0c9a0', d:'#c0392b'}, g: [
+      '..aaaa..','.aaaaaa.','.adccda.','..aaaa..','.abbbba.','a.bbbb.a','..b..b..','.aa..aa.'] },
+    monk:   { pal: {a:'#e07a3c', b:'#a8552a', c:'#f0c9a0', d:'#3a2a1a'}, g: [
+      '..cccc..','.cccccc.','.cdccdc.','..cccc..','.aaaaaa.','c.abba.c','..a..a..','.dd..dd.'] },
+    beast:  { pal: {a:'#8a6a4a', b:'#5a4430', c:'#e8e0d0', d:'#1a1410', e:'#e5484d'}, g: [
+      'a......a','aa.aa.aa','.aaaaaa.','acdaadca','.aaccaa.','.aeeeea.','aabbbbaa','.a.aa.a.'] },
+  };
+  const svg = key => {
+    const s = P[key]; let r = '';
+    s.g.forEach((row,y) => [...row].forEach((ch,x) => {
+      if (ch !== '.') r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${s.pal[ch]}"/>`;
+    }));
+    return `<svg viewBox="0 0 8 8" aria-hidden="true">${r}</svg>`;
+  };
+  document.querySelectorAll('[data-h]').forEach(el => el.insertAdjacentHTML('afterbegin', svg(el.dataset.h)));
+  document.querySelectorAll('[data-face]').forEach(el => el.querySelector('.face').innerHTML = svg(el.dataset.face));
+
+  // ---------- value / squint toggles ----------
+  const mock = document.getElementById('mock');
+  [['tGray','gray'],['tBlur','blur']].forEach(([id, cls]) => {
+    const b = document.getElementById(id);
+    b.addEventListener('click', () => {
+      const on = mock.classList.toggle(cls);
+      b.setAttribute('aria-pressed', on);
+    });
+  });
+</script>
+</body>
+</html>
