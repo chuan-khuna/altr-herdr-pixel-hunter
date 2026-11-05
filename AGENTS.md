@@ -10,20 +10,22 @@ Read its **Layouts**, **Mods** and **Share** sections before touching anything.
 ## Where things live
 
 - **Build in the live config, not here.** The layout is developed in
-  `~/.config/herdr-app/layouts/pixel-hunter.json` and
-  `~/.config/herdr-app/mods/pixel-hunter*/`, where the window redraws as you
+  `~/.config/herdr-app/layouts/pixel-hunter.json`,
+  `~/.config/herdr-app/themes/pixel-hunter*.json` and
+  `~/.config/herdr-app/mods/pixel-hunter*/` (fonts in its `fonts/`), where the window redraws as you
   edit. This repo holds a copy.
 - `pixel-hunter/` is the shared folder, laid out like the Herdr home:
 
   ```
   pixel-hunter/
     layouts/pixel-hunter.json   (+ its preview svg/png if the layout names one)
+    themes/pixel-hunter-night.json
     mods/<each mod the layout uses that isn't shipped by Herdr>/
     RECIPE.md                     brief another agent builds it from, empty folder
     preview.png                   screenshot of the layout running
   ```
 
-- `scripts/sync.sh` copies the live layout and its `pixel-hunter*` mods into
+- `scripts/sync.sh` copies the live layout, its `pixel-hunter*` themes and mods into
   `pixel-hunter/`. Run it before every commit. Drop generated files a fresh
   install recreates (`gpui-kit.d.ts`, `jsconfig.json`) if the script copies them.
 
