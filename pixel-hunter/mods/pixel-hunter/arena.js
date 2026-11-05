@@ -105,7 +105,8 @@ function attacks(m, dir, w, id) {
 // - idle: its Idle strip while the arena is awake (someone Needs help), a still first frame when calm;
 // - slain: the still first frame, dropped FALL px and faded. The drop and fade are a one-shot
 //   native transition on `ph-arena-mbody-*`, which keeps its id across modes, so it plays
-//   when the Monster falls (and runs back up on Respawn); a Monster already Slain when the
+//   when the Monster falls. A Respawn brings a different Monster (new ids), which just stands
+//   there at full height; a Monster already Slain when the
 //   arena first draws just lies there. Nothing moves afterwards.
 function monster(area, active) {
   const m = MONSTER_ART[area.monster.id];

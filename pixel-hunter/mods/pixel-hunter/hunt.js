@@ -26,12 +26,16 @@
 //           that name has that Class, whatever it had before. Names match trimmed and ignoring
 //           case; an unknown Class or a bad entry is ignored. See classPins()
 //   now     ms, passed in, never read from a clock here, so HP wear and staleness are deterministic
+//   random  optional () => 0..1, defaults to Math.random; used only to pick the Monster of a
+//           Respawn, so tests can inject it
 //
 // Output:
 //   areas   [{ id, index, name, named, current, map, monster, worst, path, branch, key, hunters, arena,
 //              tabs, hp, mode, wearing, expanded, held }]
 //           map     { id: "forest", name: "Forest", monsters: [...] }
-//           monster { id: "GiantRacoon", name: "Giant Racoon" }  (the pack's sprite folder)
+//           monster the current Monster, { id: "GiantRacoon", name: "Giant Racoon" } (id: the
+//                   pack's sprite folder): the map's own until the Area's first Respawn, then
+//                   the one the last Respawn picked (see monsterStep)
 //           worst   the worst hunt state in the Party, or null with no Hunters
 //           path    the first terminal's folder for display ("~/code/x", shortened when long);
 //                   while it has no cwd the space's folder, then home ("~"); never "undefined"
@@ -69,12 +73,14 @@
 //           without one; branch its own git branch, null outside git; frame "help" (peach)
 //           when its Hunter Needs help, else "focus" (mint) when it has the keyboard, else null
 //   state   the next persisted state: { ...state, classes: { [terminal]: "Knight" } (pins included),
-//           monsters: { [spaceId]: { hp, since, slain } }, collapsed: { [spaceId]: true | false } }
+//           monsters: { [spaceId]: { hp, since, slain, id? } }, collapsed: { [spaceId]: true | false } }
 //           collapsed holds only choices made by hand (true: collapsed, false: expanded);
 //           toggleArea() makes one. Records of closed spaces go, as for monsters.
 //           A Monster record changes only when its Party starts or stops Hunting, is Slain or
 //           Respawns: `hp` is its HP at `since` (ms, while wearing) or for good (since null),
 //           so the state isn't rewritten on every render, and a restart picks up where it was.
+//           `id` is the current Monster, written by a Respawn; without one (old state, or an
+//           unknown id) the Area's Monster is its map's own.
 
 export const MAPS = [
   { id: "forest", name: "Forest", monsters: [{ id: "GiantRacoon", name: "Giant Racoon" }] },
@@ -116,6 +122,19 @@ export function huntState(status) {
 /** The most urgent of some hunt states (Needs help > Hunting > Cleared > Resting), or null. */
 export function worstState(states) {
   return PRIORITY.find((s) => states.includes(s)) ?? null;
+}
+
+/** Every Monster, one per map, in map order. */
+export const MONSTERS = MAPS.flatMap((m) => m.monsters);
+const MONSTER_BY_ID = new Map(MONSTERS.map((m) => [m.id, m]));
+
+/** The Monster a Respawn brings after the one with id `slain`: any of the others, picked with
+ *  `random` (() => 0..1). A value outside 0..1 is clamped, so the pick is always one of them. */
+export function respawnPick(slain, random = Math.random) {
+  const others = MONSTERS.filter((m) => m.id !== slain);
+  const r = Number(random());
+  const i = Number.isFinite(r) ? Math.floor(r * others.length) : 0;
+  return others[Math.min(others.length - 1, Math.max(0, i))];
 }
 
 /** The map an Area gets from its position (from 0), cycling through the six. */
@@ -238,23 +257,32 @@ export function hpAfter(hp, ms) {
 
 const FRESH = { hp: HP_MAX, since: null, slain: false };
 
+// A saved record, cleaned. `id` stays only when it names a known Monster.
 function monsterRecord(r) {
   if (!r || typeof r !== "object") return { ...FRESH };
   const hp = Number.isFinite(r.hp) ? Math.min(HP_MAX, Math.max(0, r.hp)) : HP_MAX;
-  return { hp, since: Number.isFinite(r.since) ? r.since : null, slain: r.slain === true };
+  const out = { hp, since: Number.isFinite(r.since) ? r.since : null, slain: r.slain === true };
+  if (MONSTER_BY_ID.has(r.id)) out.id = r.id;
+  return out;
 }
 
 // One Monster's next record from its Party: Slain once nobody Hunts and someone's agent is
 // done, a Respawn with full HP when someone Hunts after that, and HP wearing in between.
-function monsterStep(old, party, now) {
+// A Respawn brings a different Monster (respawnPick, from the Slain one: `id`, else `own`, the
+// map's own) and writes it as `id`; every other step keeps the id it had, or none.
+function monsterStep(old, party, now, own, random) {
   const r = monsterRecord(old);
+  const keep = (rec) => (r.id ? { ...rec, id: r.id } : rec);
   const hunting = party.some((h) => h.state === "hunting");
   const done = party.some((h) => h.done);
   const hpNow = r.since == null ? r.hp : hpAfter(r.hp, now - r.since);
-  if (r.slain) return hunting ? { hp: HP_MAX, since: now, slain: false } : { hp: 0, since: null, slain: true };
-  if (!hunting && done) return { hp: 0, since: null, slain: true };
-  if (hunting) return r.since == null ? { hp: r.hp, since: now, slain: false } : r;
-  return r.since == null ? r : { hp: hpNow, since: null, slain: false };
+  if (r.slain) {
+    if (!hunting) return keep({ hp: 0, since: null, slain: true });
+    return { hp: HP_MAX, since: now, slain: false, id: respawnPick(r.id ?? own, random).id };
+  }
+  if (!hunting && done) return keep({ hp: 0, since: null, slain: true });
+  if (hunting) return r.since == null ? keep({ hp: r.hp, since: now, slain: false }) : r;
+  return r.since == null ? r : keep({ hp: hpNow, since: null, slain: false });
 }
 
 // The panes of a space in tab order, then their own order.
@@ -395,8 +423,9 @@ function monsterView(r, now) {
   };
 }
 
-export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}, sessions = {}, ranks, pins, now = 0 } = {}) {
+export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}, sessions = {}, ranks, pins, now = 0, random = Math.random } = {}) {
   now = Number.isFinite(now) ? now : 0;
+  random = typeof random === "function" ? random : Math.random;
   spaces = (spaces ?? []).filter((s) => s && s.id != null);
   panes = (panes ?? []).filter(Boolean);
   keys = keys ?? {};
@@ -476,7 +505,6 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       named: !!s.named,
       current: !!s.active,
       map,
-      monster: map.monsters[0],
       worst: worstState(hunters.map((h) => h.state)),
       path: displayPath(where, home),
       branch,
@@ -488,7 +516,8 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       held: help,
       ...monsterView((monsters[s.id] = monsterStep(oldMonsters[s.id], agentsOf(ps).map((p) => ({
         state: huntState(p.status), done: p.status === "done" || p.report === "done",
-      })), now)), now),
+      })), now, map.monsters[0].id, random)), now),
+      monster: MONSTER_BY_ID.get(monsters[s.id].id) ?? map.monsters[0],
     };
   });
 

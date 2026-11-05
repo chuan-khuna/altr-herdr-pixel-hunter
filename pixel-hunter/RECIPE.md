@@ -36,7 +36,8 @@ Left to right:
    - Up to **four Hunters** (16 px sprites drawn 32 px) stand on the left facing it, at
      (44, 52), (92, 70), (40, 104) and (88, 122), most urgent first. With more than four, a
      `+N` chip sits top-left (12 px text on canvas at 80% opacity).
-   - Bottom-left, a caption `Desert · Demon Cyclops` (12 px, same chip style).
+   - Bottom-left, a caption `Desert · Demon Cyclops`, the map and the Area's current Monster
+     (12 px, same chip style).
    - Bottom-right (right 12, bottom 8), the **HP bar**: 110 px wide, a 2 px `border`
      frame on canvas around an 8 px `#c38890` fill, with `HP` (`dim`) or `SLAIN`
      (`foreground`) under it in 12 px.
@@ -74,9 +75,11 @@ Left to right:
 
 Hunter Classes and their Ninja Adventure characters: Knight (Knight), Mage
 (SorcererBlack), Archer (Hunter), Rogue (NinjaMasked), Monk (Monk), Samurai (Samurai).
-Maps and their Monsters: Forest, Giant Racoon; Desert, Demon Cyclops; Dungeon, Giant
+Maps and their own Monsters: Forest, Giant Racoon; Desert, Demon Cyclops; Dungeon, Giant
 Spirit; Field, Blue Tengu; Ruins, Red Warlord (the pack's GiantRedSamurai); Lakeside,
-Giant Frog.
+Giant Frog. An Area starts with its map's own Monster; after a Respawn any of the six can
+live in any map, and the arena sprite, the caption and the Area row's face all show the
+current one.
 
 ### Work column
 
@@ -143,11 +146,13 @@ Giant Frog.
   saying `done` after Herdr shows it as seen), the Monster is **Slain**: HP drops to 0
   (the bars drain over 600 ms), `HP` turns to `SLAIN`, and the Monster drops 14 px and
   fades to 35% over 600 ms. It stays Slain until someone Hunts again.
-- Then a fresh Monster of the same map **Respawns** with HP 100 (the fall runs back up,
-  the bars refill).
+- Then a fresh Monster **Respawns** with HP 100 (the bars refill): one of the other five
+  Monsters, picked at random (never the one just Slain; the map's own can come back). It
+  stands up at once in place of the fallen one, and stays that Area's Monster until its
+  next Respawn.
 - With someone Needing help but nobody Hunting it idles (its Idle strip, 160 ms a frame);
   with everyone Resting or Cleared it stands still on its first frame. HP pauses.
-- HP and Slain are kept across restarts (Herdr's shared state).
+- HP, Slain and the current Monster are kept across restarts (Herdr's shared state).
 - With nobody Hunting or Needing help and no Stamina record about to go old, nothing
   redraws: no loops, no timers.
 
@@ -236,15 +241,17 @@ and `solid_foreground` `#101a24`, `solid` `#95c5ac`, and a custom `hp` `#c38890`
   draws the fixed `demo.js` snapshot instead, for screenshots), `tabs` (`tabs.js`), `pane`
   (`pane.js`; Herdr adds `pane` and `terminal` to its props).
 - `hunt.js`: the hunt model, pure and with no Herdr imports:
-  `hunt({ spaces, panes, home, keys, state, sessions, ranks, pins, now }) -> { areas, panes, state }`.
+  `hunt({ spaces, panes, home, keys, state, sessions, ranks, pins, now, random }) -> { areas, panes, state }`.
   Maps, Monsters, Classes, states, arena pick, HP, Slain, Respawn, open or closed, Rank,
-  Stamina and pins are all decided here, with time passed in. Tests: `node --test` in the
-  mod folder (`test/hunt.test.js`, `test/statusline.test.js`, 49 cases).
+  Stamina and pins are all decided here, with time passed in, and `random` (default
+  `Math.random`) used only for the Respawn pick. Tests: `node --test` in the mod folder
+  (`test/hunt.test.js`, `test/statusline.test.js`, 53 cases).
 - `world.js`: the only place that reads Herdr for the model (`spaces()`, `panes()`,
   `terminals()` for herdr-core's own `done`, `keys()`, `home()`). It keeps the model's
   state in `shared("pixel-hunter.state")`:
-  `{ classes: {terminal: Class}, monsters: {spaceId: {hp, since, slain}}, collapsed: {spaceId: bool} }`,
-  written only when it changes. Every role that draws Hunters calls it.
+  `{ classes: {terminal: Class}, monsters: {spaceId: {hp, since, slain, id?}}, collapsed: {spaceId: bool} }`,
+  written only when it changes; `id` (the current Monster) is written by a Respawn, and a
+  record without one means the map's own Monster. Every role that draws Hunters calls it.
 - `sessions.js`: reads `rank.json` once per load, and watches
   `<Herdr home>/data/pixel-hunter/sessions/` (`watchFolder`, creating the folder), re-reading
   the records (at most 256) on each change. Run by the sidebar and every pane header.
@@ -373,7 +380,7 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
 ## Done when
 
 - `herdr-app check ~/.config/herdr-app/mods/pixel-hunter` passes, and `node --test` in that
-  folder passes all 49 tests.
+  folder passes all 53 tests.
 - `layout.switch pixel-hunter` shows the 320 px sidebar (logo, arena, Area list), the 44 px
   tab bar and framed panes with 30 px Hunter headers; `herdr-app status` lists no errors.
 - `PIXEL HUNTER` is in Press Start 2P and the rest in Pixelify Sans; frames are square 2 px.
@@ -385,7 +392,9 @@ CC0 1.0; `art/CREDITS.md` maps every file to its pack path):
 - `state=blocked`: the row and the pane header turn peach, the arena Hunter raises a hand
   under a blinking `!`, and its Area opens and can't be closed.
 - `state=done` with nobody else Hunting: `SLAIN`, the HP bar empty, the Monster sinks and
-  fades. `state=working` again: it Respawns at full HP.
+  fades. `state=working` again: a different Monster Respawns at full HP, the same one in
+  the arena, the caption and the Area row's face, and still the same after
+  `layout.switch main` and back.
 - With nobody Hunting or Needing help, two shots a few seconds apart are identical.
 - Without the statusLine script every Hunter shows `?`, its program and `STA —`. Piping
   `{"model":{"display_name":"Opus 5.5"},"context_window":{"remaining_percentage":62}}` into

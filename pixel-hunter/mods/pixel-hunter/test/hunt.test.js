@@ -1,7 +1,7 @@
 // The hunt model, snapshot in and view model out. Run: node --test mods/pixel-hunter/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hunt, displayPath, folderName, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS, paneFrame, toggleArea, classPins } from "../hunt.js";
+import { hunt, displayPath, folderName, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS, gradeFor, staminaLevel, rankTable, RANKS, paneFrame, toggleArea, classPins, MONSTERS } from "../hunt.js";
 import { readFileSync } from "node:fs";
 
 const HOME = "/Users/me";
@@ -349,6 +349,93 @@ test("a Hunter starting to Hunt after a Slain brings a fresh Monster with full H
   assert.equal(back.mode, "hit");
   assert.equal(back.hp, HP_MAX);
   assert.ok(h.step(MIN + HP_HALF_MS, ["working"]).hp < HP_MAX, "and the new one wears down");
+});
+
+// Random Respawn. `random` is injected; it is only called for a Respawn.
+const IDS = MONSTERS.map((m) => m.id);
+function respawning(random, index = 0) {
+  const spaces = Array.from({ length: index + 1 }, (_, i) => space({ id: `r${i}` }));
+  const a = spaces[index];
+  let state = {};
+  return {
+    step(now, status) {
+      const out = hunt({ spaces, panes: [agent(a, "r", { status })], home: HOME, state, now, random });
+      state = JSON.parse(JSON.stringify(out.state)); // as shared state stores it
+      return out.areas[index];
+    },
+    get state() { return state; },
+    set state(s) { state = s; },
+  };
+}
+const never = () => { throw new Error("random called without a Respawn"); };
+
+test("an Area's first Monster is its map's own, and random is not used for it", () => {
+  const { areas } = hunt({ spaces: Array.from({ length: 7 }, () => space()), home: HOME, random: never });
+  assert.deepEqual(areas.map((a) => a.monster.id), [...IDS, IDS[0]]);
+  const h = respawning(never, 5); // Lakeside
+  assert.equal(h.step(0, "working").monster.id, "GiantFrog");
+  assert.equal(h.step(MIN, "done").monster.id, "GiantFrog", "Slain: the one that fell lies there");
+  assert.equal(h.state.monsters.r5.id, undefined, "nothing written before a Respawn");
+});
+
+test("a Respawn never repeats the Slain Monster and can pick any of the other five", () => {
+  const seen = new Set();
+  for (let k = 0; k < 5; k++) {
+    const h = respawning(() => (k + 0.5) / 5); // Forest: the Giant Racoon falls first
+    h.step(0, "done");
+    const back = h.step(MIN, "working");
+    assert.equal(back.mode, "hit");
+    assert.notEqual(back.monster.id, "GiantRacoon");
+    assert.equal(h.state.monsters.r0.id, back.monster.id, "kept in the persisted state");
+    seen.add(back.monster.id);
+  }
+  assert.deepEqual([...seen].sort(), IDS.filter((id) => id !== "GiantRacoon").sort());
+  // from a respawned Monster too, and with random at its edges (0, just under 1, 1, NaN)
+  for (const r of [0, 0.999999, 1, NaN, -3]) {
+    const h = respawning(() => r);
+    h.step(0, "done");
+    let last = h.step(MIN, "working").monster.id;
+    for (let i = 0; i < 6; i++) {
+      h.step((2 + 2 * i) * MIN, "done");
+      const next = h.step((3 + 2 * i) * MIN, "working").monster.id;
+      assert.notEqual(next, last, `random ${r}: a Respawn never brings back the one just Slain`);
+      assert.ok(IDS.includes(next));
+      last = next;
+    }
+  }
+});
+
+test("between Respawns the Monster stays: wearing, pausing and Slain keep it, and random isn't called", () => {
+  const h = respawning(() => 0.99); // after the Racoon: the last of the others, the Giant Frog
+  h.step(0, "done");
+  assert.equal(h.step(MIN, "working").monster.id, "GiantFrog");
+  const frog = h.state.monsters.r0.id;
+  const calm = respawning(never);
+  calm.state = h.state;
+  for (const [t, status] of [[2, "working"], [3, "blocked"], [4, "idle"], [5, "working"], [6, "done"], [7, "idle"]]) {
+    assert.equal(calm.step(t * MIN, status).monster.id, frog, `${status} keeps the Monster`);
+  }
+  assert.equal(calm.step(8 * MIN, "idle").mode, "slain");
+});
+
+test("the respawned Monster survives a restart; old state without an id means the map's own", () => {
+  const h = respawning(() => 0.3, 1); // Desert
+  h.step(0, "done");
+  const back = h.step(MIN, "working");
+  assert.notEqual(back.monster.id, "DemonCyclop");
+  const saved = JSON.parse(JSON.stringify(h.state));
+  const empty = hunt({ spaces: [], panes: [], home: HOME, state: saved, now: 2 * MIN, random: never });
+  assert.deepEqual(empty.state.monsters, saved.monsters, "nothing is lost while Herdr is starting");
+  const again = respawning(never, 1);
+  again.state = empty.state;
+  assert.equal(again.step(2 * MIN, "working").monster.id, back.monster.id);
+
+  const spaces = [space({ id: "o0" }), space({ id: "o1" })];
+  const old = { monsters: { o0: { hp: 40, since: null, slain: false }, o1: { hp: 0, since: null, slain: true, id: "NoSuchBoss" } } };
+  const { areas, state } = hunt({ spaces, home: HOME, state: old, now: 0, random: never });
+  assert.deepEqual(areas.map((a) => a.monster.id), ["GiantRacoon", "DemonCyclop"]);
+  assert.equal(areas[0].hp, 40);
+  assert.equal(state.monsters.o1.id, undefined, "an unknown id is dropped");
 });
 
 test("HP and Slain survive a restart: a new run with the saved state picks up where it was", () => {

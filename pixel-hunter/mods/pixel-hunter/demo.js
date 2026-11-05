@@ -7,8 +7,9 @@ export const DEMO = {
   home: H,
   keys: { 1: "⌃1", 2: "⌃2", 3: "⌃3", 4: "⌃4" },
   // Monster HP as in the mock: shop-api worn to 58 and fighting, the Desert Monster Slain,
-  // Login fix at 80, dotfiles untouched (full).
-  state: { monsters: { d1: { hp: 58, since: null, slain: false }, d2: { hp: 0, since: null, slain: true }, d3: { hp: 80, since: null, slain: false } } },
+  // Login fix at 80, dotfiles untouched (full). Login fix (Dungeon) has had a Respawn: its
+  // Monster is the Giant Frog, not the map's own Giant Spirit.
+  state: { monsters: { d1: { hp: 58, since: null, slain: false }, d2: { hp: 0, since: null, slain: true }, d3: { hp: 80, since: null, slain: false, id: "GiantFrog" } } },
   spaces: [
     { id: "d1", name: "shop-api", named: false, folder: "", branch: "feat/login", active: true, tabs: tab("dt1") },
     { id: "d2", name: "herdr-monster-hunter", named: false, folder: "", branch: "main", active: false, tabs: tab("dt2") },
