@@ -1,0 +1,4 @@
+# Cloned reference repos; only the README and this file are tracked.
+*
+!.gitignore
+!README.md
