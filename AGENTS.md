@@ -41,3 +41,17 @@ Read its **Layouts**, **Mods** and **Share** sections before touching anything.
 
 Never list a shipped Herdr mod (e.g. `files`, `changes`) as part of this
 layout's folder; reference it by name in RECIPE.md's **Built from** instead.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as local markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
