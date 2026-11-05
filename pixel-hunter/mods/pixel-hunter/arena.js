@@ -2,15 +2,16 @@
 // The background is 160x96 art px shown at 2x; the Monster stands on the right playing
 // its Idle strip, aligned by its feet; up to four Hunters stand on the left facing it.
 //
-// Everything moves natively (opacity/top loops, `top` transitions, text frames) and only
-// while the Party has someone Hunting or Needing help. With everyone Resting or Cleared,
+// Everything moves natively (opacity/top/left loops, `top`/`opacity`/`width` transitions,
+// text frames) and only while the Party has someone Hunting or Needing help; the one
+// exception is the Monster's fall when it's Slain, a single one-shot transition. With everyone Resting or Cleared,
 // the scene is drawn still and schedules nothing; a Cleared hop is two one-shot timers.
 //
 // Sprites come from art/x4/ (4x nearest-neighbour copies made by tools/build-art.py):
 // GPUI smooths scaled images, so a 4x file drawn at 2x keeps every art pixel square.
 import { div, image } from "gpui-kit";
 import { FRAME } from "./theme.js";
-import { plain } from "./areas.js";
+import { plain, hpBar } from "./areas.js";
 
 const X4 = "mods/pixel-hunter/art/x4";
 export const ARENA_VERSION = 1; // bump with tools/build-art.py: Herdr caches images by name
@@ -18,17 +19,26 @@ const S = 2; // art px -> logical px
 export const ARENA_W = 160 * S;
 export const ARENA_H = 96 * S;
 
-// Monster Idle strips: square frames of `size` art px, `feet` = the lowest opaque row.
+// Monster strips: square frames of `size` art px, `feet` = just below the lowest opaque
+// row. `hit` plays while the Party Hunts (Racoon has no Hit strip: its Attack plays).
 const MONSTER_ART = {
-  GiantRacoon: { file: "Idle.png", size: 60, frames: 6, feet: 55 },
-  DemonCyclop: { file: "Idle.png", size: 50, frames: 5, feet: 43 },
-  GiantSpirit: { file: "Idle.png", size: 50, frames: 5, feet: 48 },
-  TenguBlue: { file: "Idle.png", size: 68, frames: 6, feet: 51 },
-  GiantRedSamurai: { file: "Idle.png", size: 48, frames: 12, feet: 44 },
-  GiantFrog: { file: "Idle40x40.png", size: 40, frames: 5, feet: 33 },
+  GiantRacoon: { file: "Idle.png", size: 60, frames: 6, feet: 55, hit: { file: "Attack.png", frames: 4, feet: 60 } },
+  DemonCyclop: { file: "Idle.png", size: 50, frames: 5, feet: 43, hit: { file: "Hit.png", frames: 3, feet: 43 } },
+  GiantSpirit: { file: "Idle.png", size: 50, frames: 5, feet: 48, hit: { file: "Hit.png", frames: 3, feet: 48 } },
+  TenguBlue: { file: "Idle.png", size: 68, frames: 6, feet: 51, hit: { file: "Hit.png", frames: 8, feet: 60 } },
+  GiantRedSamurai: { file: "Idle.png", size: 48, frames: 12, feet: 44, hit: { file: "Hit.png", frames: 8, feet: 46 } },
+  GiantFrog: { file: "Idle40x40.png", size: 40, frames: 5, feet: 33, hit: { file: "Hit.png", frames: 3, feet: 33 } },
 };
 const MONSTER_FEET = { x: 236, y: 128 }; // logical px in the arena
 const MONSTER_FRAME_MS = 160;
+const HIT_FRAME_MS = 90;
+const SHAKE = 2; // px either way, there and back every SHAKE_MS
+const SHAKE_MS = 300;
+// Slain: the Monster drops FALL px and fades to SLAIN_OPACITY in one native transition.
+const FALL = 14;
+const SLAIN_OPACITY = 0.35;
+const FALL_MS = 600;
+const HP_W = 110;
 
 // Hunter slots (top-left of a 32 px sprite), most urgent first.
 const SLOTS = [[44, 52], [92, 70], [40, 104], [88, 122]];
@@ -54,23 +64,57 @@ function frame(path, fw, fh, n, col) {
 
 const hunterArt = (h, file) => `${X4}/chars/${h.cls.sprite}/${file}.png`;
 
-// The Monster: a still first frame when calm; while active, its frames take turns (there
-// and back) through nested band loops, one frame shown at a time.
+// A strip's frames taking turns (there and back) through nested band loops, one at a time.
+function strip(path, size, n, frameMs, tag) {
+  const period = 2 * n * frameMs;
+  return Array.from({ length: n }, (_, k) => {
+    let el = frame(path, size, size, n, k);
+    if (k < n - 1) el = div().id(`ph-arena-${tag}-${k}-b`).loop("opacity", before((k + 1) / n, period)).child(el);
+    if (k > 0) el = div().id(`ph-arena-${tag}-${k}-a`).loop("opacity", after(k / n, period)).child(el);
+    return div().absolute().left(0).top(0).child(el);
+  });
+}
+
+// The Monster by `area.mode`:
+// - hit (someone Hunting): its Hit strip, shaking SHAKE px either way;
+// - idle: its Idle strip while the arena is awake (someone Needs help), a still first frame when calm;
+// - slain: the still first frame, dropped FALL px and faded. The drop and fade are a one-shot
+//   native transition on `ph-arena-mbody-*`, which keeps its id across modes, so it plays
+//   when the Monster falls (and runs back up on Respawn); a Monster already Slain when the
+//   arena first draws just lies there. Nothing moves afterwards.
 function monster(area, active) {
   const m = MONSTER_ART[area.monster.id];
   if (!m) return null;
-  const path = `${X4}/boss/${area.monster.id}/${m.file}`;
+  const dir = `${X4}/boss/${area.monster.id}`;
+  const hit = area.mode === "hit" && m.hit;
+  const slain = area.mode === "slain";
+  const feet = hit ? m.hit.feet : m.feet;
   const box = div().id(`ph-arena-monster-${area.monster.id}`).absolute()
-    .left(MONSTER_FEET.x - (m.size * S) / 2).top(MONSTER_FEET.y - m.feet * S)
+    .left(MONSTER_FEET.x - (m.size * S) / 2).top(MONSTER_FEET.y - feet * S)
     .w(m.size * S).h(m.size * S);
-  if (!active) return box.child(frame(path, m.size, m.size, m.frames, 0));
-  const period = 2 * m.frames * MONSTER_FRAME_MS;
-  return box.children(Array.from({ length: m.frames }, (_, k) => {
-    let el = frame(path, m.size, m.size, m.frames, k);
-    if (k < m.frames - 1) el = div().id(`ph-arena-mf-${k}-b`).loop("opacity", before((k + 1) / m.frames, period)).child(el);
-    if (k > 0) el = div().id(`ph-arena-mf-${k}-a`).loop("opacity", after(k / m.frames, period)).child(el);
-    return div().absolute().left(0).top(0).child(el);
-  }));
+  let body;
+  if (hit) {
+    body = div().id(`ph-arena-mshake-${area.monster.id}`).absolute().left(0).top(0).size_full()
+      .loop("left", { from: -SHAKE, to: SHAKE, period: SHAKE_MS, easing: "linear" })
+      .children(strip(`${dir}/${m.hit.file}`, m.size, m.hit.frames, HIT_FRAME_MS, "mh"));
+  } else if (active && !slain) {
+    body = div().absolute().left(0).top(0).size_full().children(strip(`${dir}/${m.file}`, m.size, m.frames, MONSTER_FRAME_MS, "mi"));
+  } else {
+    body = frame(`${dir}/${m.file}`, m.size, m.size, m.frames, 0);
+  }
+  return box.child(div().id(`ph-arena-mbody-${area.monster.id}`).absolute().left(0).size_full()
+    .top(slain ? FALL : 0).opacity(slain ? SLAIN_OPACITY : 1)
+    .transition("top", { duration: FALL_MS, easing: "ease-in" })
+    .transition("opacity", { duration: FALL_MS, easing: "ease-in" })
+    .child(body));
+}
+
+// The HP bar, bottom-right: the same bar as the Area row's, with "HP" or "SLAIN" under it.
+function hp(area, c) {
+  return div().absolute().right(12).bottom(8).w(HP_W).flex().flex_col().items_end().gap(2)
+    .child(hpBar("arena", area, HP_W, c))
+    .child(div().px(4).text_size(12).text_color(area.mode === "slain" ? c.foreground : c.dim).bg(`${c.canvas}cc`)
+      .child(area.mode === "slain" ? "SLAIN" : "HP"));
 }
 
 // A Hunter in its slot, facing right, animated by its hunt state.
@@ -143,5 +187,6 @@ export function arena(self, model, c, cx) {
       .when(beast != null, (el) => el.child(beast))
       .children(hunters.map((h, i) => hunter(self, h, SLOTS[i], active, c)))
       .child(label(plain(`${area.map.name} · ${area.monster.name}`), c).left(10).bottom(6))
+      .child(hp(area, c))
       .when(more > 0, (el) => el.child(label(`+${more}`, c).left(10).top(8))));
 }

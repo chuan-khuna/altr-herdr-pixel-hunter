@@ -23,7 +23,12 @@ for theme in "$HOME_DIR"/themes/"$NAME"*.json; do
 done
 for mod in "$HOME_DIR"/mods/"$NAME"*/; do
   m="$(basename "$mod")"
-  rsync -a --exclude gpui-kit.d.ts --exclude jsconfig.json "$mod" "$DEST/mods/$m/"
+  if command -v rsync >/dev/null; then
+    rsync -a --exclude gpui-kit.d.ts --exclude jsconfig.json "$mod" "$DEST/mods/$m/"
+  else # Git Bash on Windows has no rsync: copy, then drop what a fresh install recreates
+    cp -R "${mod%/}" "$DEST/mods/$m"
+    find "$DEST/mods/$m" \( -name gpui-kit.d.ts -o -name jsconfig.json \) -delete
+  fi
   echo "copied mod $m"
 done
 echo "synced layout $NAME -> $DEST"

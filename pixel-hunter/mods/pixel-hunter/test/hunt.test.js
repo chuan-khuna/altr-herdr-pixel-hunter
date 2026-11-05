@@ -1,7 +1,7 @@
 // The hunt model, snapshot in and view model out. Run: node --test mods/pixel-hunter/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hunt, displayPath, keyLabel } from "../hunt.js";
+import { hunt, displayPath, keyLabel, hpAfter, HP_MAX, HP_FLOOR, HP_HALF_MS } from "../hunt.js";
 
 const HOME = "/Users/me";
 let n = 0;
@@ -185,4 +185,126 @@ test("each space has its own arena map and Monster", () => {
   const current = areas.find((x) => x.current);
   assert.equal(current.map.id, "desert");
   assert.equal(current.monster.name, "Demon Cyclops");
+});
+
+// Monster HP, Slain and Respawn. Time is injected: each step passes the last state and a `now`.
+const MIN = 60 * 1000;
+function hunting(statuses) {
+  const a = space({ id: "hp" });
+  let state = {};
+  return {
+    step(now, list = statuses) {
+      const out = hunt({ spaces: [a], panes: list.map((status, i) => agent(a, `h${i}`, { status })), home: HOME, state, now });
+      state = out.state;
+      return out.areas[0];
+    },
+    get state() { return state; },
+  };
+}
+
+test("a fresh Monster has full HP and idles until its Party Hunts", () => {
+  const h = hunting(["idle"]);
+  const area = h.step(0);
+  assert.equal(area.hp, HP_MAX);
+  assert.equal(area.mode, "idle");
+  assert.equal(area.wearing, false);
+  assert.equal(hunt({ spaces: [space()], home: HOME }).areas[0].hp, HP_MAX, "an Area with no Hunters too");
+});
+
+test("HP wears down while anyone is Hunting, with injected time, and holds when they stop", () => {
+  const h = hunting(["working"]);
+  const start = h.step(1000);
+  assert.equal(start.mode, "hit");
+  assert.equal(start.hp, HP_MAX);
+  assert.equal(start.wearing, true);
+  const half = h.step(1000 + HP_HALF_MS);
+  assert.equal(half.hp, HP_FLOOR + (HP_MAX - HP_FLOOR) / 2);
+  assert.ok(h.step(1000 + 3 * HP_HALF_MS).hp < half.hp);
+  const long = h.step(1000 + 100 * HP_HALF_MS).hp;
+  assert.ok(long >= HP_FLOOR && long > 0, "Hunting alone never takes HP to 0");
+
+  // Needs help and Resting stop the wear (nobody is Hunting, nobody is Cleared): HP holds
+  const g = hunting(["working"]);
+  g.step(0);
+  const paused = g.step(5 * MIN, ["blocked", "idle"]);
+  assert.equal(paused.mode, "idle");
+  assert.equal(paused.wearing, false);
+  assert.equal(g.step(50 * MIN, ["blocked", "idle"]).hp, paused.hp);
+  assert.equal(paused.hp, hpAfter(HP_MAX, 5 * MIN));
+  // and wearing goes on from there when someone Hunts again
+  g.step(60 * MIN, ["working", "idle"]);
+  assert.equal(g.step(61 * MIN, ["working", "idle"]).hp, hpAfter(paused.hp, MIN));
+});
+
+test("the state is rewritten only when the hunt changes, not on every render", () => {
+  const h = hunting(["working"]);
+  h.step(0);
+  const before = JSON.stringify(h.state);
+  h.step(MIN);
+  h.step(2 * MIN);
+  assert.equal(JSON.stringify(h.state), before);
+});
+
+test("Slain only when nobody is Hunting and someone is Cleared; a mixed Party keeps it alive", () => {
+  const h = hunting(["working", "working"]);
+  h.step(0);
+  const mixed = h.step(MIN, ["done", "working"]);
+  assert.equal(mixed.mode, "hit", "one Cleared, one Hunting: the Monster is still fighting");
+  assert.ok(mixed.hp > 0);
+  const help = hunting(["blocked", "idle"]).step(0);
+  assert.equal(help.mode, "idle", "nobody Cleared: not Slain");
+
+  const slain = h.step(2 * MIN, ["done", "idle"]);
+  assert.equal(slain.mode, "slain");
+  assert.equal(slain.hp, 0);
+  assert.equal(slain.wearing, false);
+  // looking at a Cleared agent turns it idle in Herdr: the Monster stays Slain
+  assert.equal(h.step(3 * MIN, ["idle", "idle"]).mode, "slain");
+  assert.equal(h.step(30 * MIN, ["idle", "blocked"]).hp, 0);
+});
+
+test("a hunt finished while watched (Herdr shows Resting, the core still says done) slays the Monster", () => {
+  const a = space();
+  const run = (report, state) => hunt({ spaces: [a], panes: [agent(a, "w", { status: "idle", report })], home: HOME, state, now: MIN });
+  const watched = run("done", {}).areas[0];
+  assert.equal(watched.hunters[0].state, "resting", "the Hunter's label follows Herdr");
+  assert.equal(watched.mode, "slain");
+  assert.equal(run("idle", {}).areas[0].mode, "idle", "an agent that never finished doesn't slay it");
+  const busy = hunt({ spaces: [a], panes: [agent(a, "w", { status: "idle", report: "done" }), agent(a, "x", { status: "working" })], home: HOME, now: 0 });
+  assert.equal(busy.areas[0].mode, "hit", "someone still Hunting keeps it alive");
+});
+
+test("a Hunter starting to Hunt after a Slain brings a fresh Monster with full HP", () => {
+  const h = hunting(["done"]);
+  assert.equal(h.step(0).mode, "slain");
+  const back = h.step(MIN, ["working"]);
+  assert.equal(back.mode, "hit");
+  assert.equal(back.hp, HP_MAX);
+  assert.ok(h.step(MIN + HP_HALF_MS, ["working"]).hp < HP_MAX, "and the new one wears down");
+});
+
+test("HP and Slain survive a restart: a new run with the saved state picks up where it was", () => {
+  const a = space({ id: "a" }), b = space({ id: "b" });
+  const panes = [agent(a, "a1", { status: "working" }), agent(b, "b1", { status: "done" })];
+  const first = hunt({ spaces: [a, b], panes, home: HOME, state: {}, now: 0 });
+  const saved = JSON.parse(JSON.stringify(first.state)); // as shared state stores it
+  // Herdr restarts: no spaces yet on the first render, then the same ones
+  const empty = hunt({ spaces: [], panes: [], home: HOME, state: saved, now: 2 * MIN });
+  assert.deepEqual(empty.state.monsters, saved.monsters, "nothing is lost while Herdr is starting");
+  const after = hunt({ spaces: [a, b], panes, home: HOME, state: empty.state, now: 2 * MIN }).areas;
+  assert.equal(after[0].mode, "hit");
+  assert.equal(after[0].hp, hpAfter(HP_MAX, 2 * MIN));
+  assert.equal(after[1].mode, "slain");
+  assert.equal(after[1].hp, 0);
+});
+
+test("a closed space's Monster is dropped; bad saved records start fresh", () => {
+  const a = space({ id: "keep" });
+  const { state, areas } = hunt({
+    spaces: [a], home: HOME, now: 0,
+    state: { monsters: { keep: { hp: "x", since: "y", slain: 1 }, gone: { hp: 3, since: null, slain: false } } },
+  });
+  assert.deepEqual(Object.keys(state.monsters), ["keep"]);
+  assert.equal(areas[0].hp, HP_MAX);
+  assert.equal(areas[0].mode, "idle");
 });

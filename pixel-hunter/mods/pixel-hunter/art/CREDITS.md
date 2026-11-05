@@ -37,6 +37,19 @@ Added for the arena (ticket 04), same zip, copied pixel-exact and unchanged:
 | `boss/<Boss>/Idle.png` (Frog: `Idle40x40.png`) | `Actor/Boss/<Boss>/<same>` | Monster Idle strips: Racoon 6x60, Cyclop 5x50, Spirit 5x50, Tengu 6x68, Red Samurai 12x48, Frog 5x40 |
 | `tiles/TilesetNature.png`, `TilesetField.png`, `TilesetFloor.png`, `TilesetFloorDetail.png`, `TilesetWater.png`, `TilesetDungeon.png` | `Backgrounds/Tilesets/<same>` | sources for the arena backgrounds |
 
+Added for Monster HP, Slain and Respawn (ticket 05), copied pixel-exact and unchanged:
+
+| Here | In the pack | Used as |
+| --- | --- | --- |
+| `boss/<Boss>/Hit.png` (Cyclop, Spirit, Tengu, Red Samurai, Frog) | `Actor/Boss/<Boss>/Hit.png` | Monster Hit strips: Cyclop 3x50, Spirit 3x50, Tengu 8x68, Red Samurai 8x48, Frog 3x40 |
+| `boss/GiantRacoon/Attack.png` | `Actor/Boss/GiantRacoon/Attack.png` | the Racoon has no Hit strip, so its Attack (4x60) plays instead |
+
+These six files were not taken from the official zip but from the copy of the same pack
+in this repo's `docs/records/2026-11-05-preview/na/` (a public mirror,
+github.com/MarioLDD/Kuroshiro-adventure). Every file that copy shares with the official zip
+(the six Monster faces and Idle strips, and the Knight, Hunter and Monk faces and poses,
+27 files) is byte-identical to it. Check them against the zip when it is at hand.
+
 Made from those by `tools/build-art.py` (derived, still CC0):
 
 - `arena/<map>.png`: the six 160x96 arena backgrounds composed from the tilesets,

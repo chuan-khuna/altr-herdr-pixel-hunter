@@ -1,6 +1,6 @@
 // The one place that reads Herdr for the hunt model: builds the snapshot, runs hunt(),
 // and keeps the persisted part in shared state (on disk, the same for every copy).
-import { spaces, panes, keys, home, shared, setShared, props } from "herdr";
+import { spaces, panes, terminals, keys, home, shared, setShared, props } from "herdr";
 import { hunt, keyLabel } from "./hunt.js";
 import { DEMO } from "./demo.js";
 
@@ -21,6 +21,8 @@ function spaceKeys() {
 export function world(now = Date.now()) {
   if (props()?.demo) return hunt({ ...DEMO, now }); // a screenshot snapshot, never persisted
   const state = shared(STATE_KEY) ?? {};
+  // herdr-core's own status per terminal: it keeps "done" after Herdr shows the agent as seen
+  const report = new Map((terminals() ?? []).filter(Boolean).map((t) => [t.address, t.status]));
   const out = hunt({
     spaces: spaces().map((s) => ({
       id: s.id, name: s.name, named: s.named, folder: s.folder, branch: s.branch, active: s.active,
@@ -29,6 +31,7 @@ export function world(now = Date.now()) {
     panes: panes().map((p) => ({
       pane: p.pane, terminal: p.terminal, tab: p.tab, status: p.status,
       program: p.program?.name ?? p.app ?? null, cwd: p.cwd, branch: p.branch, focused: p.focused,
+      report: report.get(p.terminal) ?? null,
     })),
     home: home(),
     keys: spaceKeys(),

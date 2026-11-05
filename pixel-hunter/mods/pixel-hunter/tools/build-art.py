@@ -160,10 +160,14 @@ def x4(img):
 # Sprite strips and faces drawn above 1:1, copied from the pack's files under art/.
 SCALED = [f"chars/{c}/{f}.png" for c in ("Knight", "SorcererBlack", "Hunter", "NinjaMasked", "Monk", "Samurai")
           for f in ("Idle", "Attack", "Item", "Jump")]
-SCALED += [f"boss/{b}/{f}" for b, idle in (("GiantRacoon", "Idle.png"), ("DemonCyclop", "Idle.png"),
-                                           ("GiantSpirit", "Idle.png"), ("TenguBlue", "Idle.png"),
-                                           ("GiantRedSamurai", "Idle.png"), ("GiantFrog", "Idle40x40.png"))
-           for f in (idle, "Faceset.png")]
+# Monsters: Idle strip, Hit strip (Racoon has no Hit, so its Attack plays instead), face.
+SCALED += [f"boss/{b}/{f}" for b, idle, hit in (("GiantRacoon", "Idle.png", "Attack.png"),
+                                                ("DemonCyclop", "Idle.png", "Hit.png"),
+                                                ("GiantSpirit", "Idle.png", "Hit.png"),
+                                                ("TenguBlue", "Idle.png", "Hit.png"),
+                                                ("GiantRedSamurai", "Idle.png", "Hit.png"),
+                                                ("GiantFrog", "Idle40x40.png", "Hit.png"))
+           for f in (idle, hit, "Faceset.png")]
 
 
 def main():

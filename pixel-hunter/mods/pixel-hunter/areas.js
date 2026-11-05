@@ -4,7 +4,7 @@
 import { div, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { run, openOverlay } from "herdr";
-import { STATES } from "./hunt.js";
+import { STATES, HP_MAX } from "./hunt.js";
 import { FRAME } from "./theme.js";
 
 const ART = "mods/pixel-hunter/art";
@@ -33,8 +33,22 @@ function monsterFaceBox(m, c) {
 // non-joiner after each f keeps the letters apart. For every name, path and branch shown.
 export const plain = (text) => String(text ?? "").replace(/f(?=[filt])/g, "f\u200c");
 
+// The Monster's HP bar, drawn the same in the arena and in the Area row from the same
+// `area.hp`, so they agree: a 2 px framed groove on canvas with an `hp` fill. A change
+// (wear on each redraw, the drain when Slain, the refill on Respawn) slides in HP_SLIDE_MS.
+export const HP_SLIDE_MS = 600;
+export function hpBar(key, area, width, c) {
+  const inner = width - 2 * FRAME;
+  const fill = Math.max(0, Math.min(inner, Math.round((inner * area.hp) / HP_MAX)));
+  return div().relative().flex_none().w(width).h(8 + 2 * FRAME).border(FRAME).border_color(c.border).bg(c.canvas)
+    .child(div().id(`ph-hp-${key}-${area.id}`).absolute().left(0).top(0).h(8).w(fill).bg(c.hp)
+      .transition("width", { duration: HP_SLIDE_MS, easing: "linear" }));
+}
+
 export const stateColor = (c, state) => c[STATES[state]?.color] ?? c.dim;
 export const stateText = (state) => `${STATES[state].icon} ${STATES[state].label}`;
+
+export const HP_ROW_W = 64;
 
 function areaHead(self, area, model, c) {
   const drag = self.drag ?? (self.drag = { pressed: null, over: null });
@@ -72,7 +86,10 @@ function areaHead(self, area, model, c) {
           .child(div().flex_none().child(plain(area.path)))
           .when(Boolean(area.branch), (el) => el
             .child(div().flex_none().child(" · "))
-            .child(div().min_w(0).truncate().text_color(c.foreground).child(plain(area.branch)))))));
+            .child(div().min_w(0).truncate().text_color(c.foreground).child(plain(area.branch)))))
+        // line 3: the Monster's HP, under the path (the 76 px face leaves room, and line 1
+        // keeps its width for the name)
+        .child(div().mt(3).child(hpBar("row", area, HP_ROW_W, c)))));
 }
 
 function hunterRow(h, c) {

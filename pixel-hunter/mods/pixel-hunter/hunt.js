@@ -8,13 +8,17 @@
 //   panes   [{ pane, terminal, tab, status, program, cwd, branch, focused }]
 //           status: "working" | "blocked" | "done" | "idle" | null (null: not an agent)
 //           program: the program's name for people ("Claude Code"), shown in place of Rank for now
+//           report: optional, the agent's own last status in herdr-core. Herdr shows "done" only
+//                   until someone looks, then "idle"; the core keeps "done". The Monster uses it
+//                   so a hunt finished while you watch still counts as done.
 //   home    the home folder, for "~"
 //   keys    optional { [spaceIndexFrom1]: "⌃1" }, the shortcut that selects each space
 //   state   persisted state from last time (see below); unknown fields are kept as they are
-//   now     ms, passed in, never read here (HP and staleness use it in later tickets)
+//   now     ms, passed in, never read from a clock here, so HP wear is deterministic
 //
 // Output:
-//   areas   [{ id, index, name, named, current, map, monster, worst, path, branch, key, hunters, arena }]
+//   areas   [{ id, index, name, named, current, map, monster, worst, path, branch, key, hunters, arena,
+//              hp, mode, wearing }]
 //           map     { id: "forest", name: "Forest", monsters: [...] }
 //           monster { id: "GiantRacoon", name: "Giant Racoon" }  (the pack's sprite folder)
 //           worst   the worst hunt state in the Party, or null with no Hunters
@@ -23,11 +27,21 @@
 //           arena   { hunters, more }: up to ARENA_MAX Hunters for the arena, most urgent first
 //                   (Needs help, Hunting, Cleared, Resting; ties keep their order), and how
 //                   many more there are (shown as "+N")
+//           hp      the Monster's HP now, 0..HP_MAX (cosmetic); 0 only when Slain
+//           mode    "hit" while anyone in the Party is Hunting, "slain" once nobody is Hunting
+//                   and someone's agent is done (Cleared, or seen and Resting with the core
+//                   still saying done); it stays Slain until someone Hunts again (Respawn
+//                   with full HP); else "idle"
+//           wearing true while HP is wearing down (mode "hit"); see hpAfter()
 //   hunters [{ terminal, pane, tab, cls, state, status, program, branch, focused }]
 //           cls     { name: "Knight", sprite: "Knight" }
 //           state   "hunting" | "help" | "cleared" | "resting"
 //           branch  its own branch only when it differs from its Area's, else null
-//   state   the next persisted state: { ...state, classes: { [terminal]: "Knight" } }
+//   state   the next persisted state: { ...state, classes: { [terminal]: "Knight" },
+//           monsters: { [spaceId]: { hp, since, slain } } }
+//           A Monster record changes only when its Party starts or stops Hunting, is Slain or
+//           Respawns: `hp` is its HP at `since` (ms, while wearing) or for good (since null),
+//           so the state isn't rewritten on every render, and a restart picks up where it was.
 
 export const MAPS = [
   { id: "forest", name: "Forest", monsters: [{ id: "GiantRacoon", name: "Giant Racoon" }] },
@@ -122,6 +136,39 @@ export function arenaPick(hunters, max = ARENA_MAX) {
   return { hunters: sorted.slice(0, max), more: Math.max(0, sorted.length - max) };
 }
 
+// Monster HP (cosmetic). While the Party Hunts, HP halves its way toward HP_FLOOR every
+// HP_HALF_MS, so it keeps moving on a long hunt but only Slain takes it to 0.
+export const HP_MAX = 100;
+export const HP_FLOOR = 5;
+export const HP_HALF_MS = 4 * 60 * 1000;
+
+/** HP after wearing for `ms` from `hp`. */
+export function hpAfter(hp, ms) {
+  if (!(hp > HP_FLOOR) || !(ms > 0)) return hp;
+  return HP_FLOOR + (hp - HP_FLOOR) * 0.5 ** (ms / HP_HALF_MS);
+}
+
+const FRESH = { hp: HP_MAX, since: null, slain: false };
+
+function monsterRecord(r) {
+  if (!r || typeof r !== "object") return { ...FRESH };
+  const hp = Number.isFinite(r.hp) ? Math.min(HP_MAX, Math.max(0, r.hp)) : HP_MAX;
+  return { hp, since: Number.isFinite(r.since) ? r.since : null, slain: r.slain === true };
+}
+
+// One Monster's next record from its Party: Slain once nobody Hunts and someone's agent is
+// done, a Respawn with full HP when someone Hunts after that, and HP wearing in between.
+function monsterStep(old, party, now) {
+  const r = monsterRecord(old);
+  const hunting = party.some((h) => h.state === "hunting");
+  const done = party.some((h) => h.done);
+  const hpNow = r.since == null ? r.hp : hpAfter(r.hp, now - r.since);
+  if (r.slain) return hunting ? { hp: HP_MAX, since: now, slain: false } : { hp: 0, since: null, slain: true };
+  if (!hunting && done) return { hp: 0, since: null, slain: true };
+  if (hunting) return r.since == null ? { hp: r.hp, since: now, slain: false } : r;
+  return r.since == null ? r : { hp: hpNow, since: null, slain: false };
+}
+
 // The panes of a space in tab order, then their own order.
 function spacePanes(space, panes) {
   const order = new Map((space.tabs ?? []).map((t, i) => [t.id, Number.isFinite(t.index) ? t.index : i + 1]));
@@ -149,8 +196,17 @@ function assignClasses(order, old) {
   return classes;
 }
 
+function monsterView(r, now) {
+  const wearing = r.since != null;
+  return {
+    hp: wearing ? hpAfter(r.hp, now - r.since) : r.hp,
+    mode: r.slain ? "slain" : wearing ? "hit" : "idle",
+    wearing,
+  };
+}
+
 export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}, now = 0 } = {}) {
-  void now;
+  now = Number.isFinite(now) ? now : 0;
   spaces = (spaces ?? []).filter((s) => s && s.id != null);
   panes = (panes ?? []).filter(Boolean);
   keys = keys ?? {};
@@ -160,6 +216,9 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
   const order = perSpace.flatMap(agentsOf).map((p) => p.terminal);
   const classes = assignClasses(order, state.classes ?? {});
   const byName = Object.fromEntries(CLASSES.map((c) => [c.name, c]));
+  const oldMonsters = state.monsters && typeof state.monsters === "object" ? state.monsters : {};
+  // Records of closed spaces go, but not while Herdr lists no spaces at all (still starting).
+  const monsters = spaces.length ? {} : { ...oldMonsters };
 
   const areas = spaces.map((s, index) => {
     const ps = perSpace[index];
@@ -192,8 +251,11 @@ export function hunt({ spaces = [], panes = [], home = "", keys = {}, state = {}
       key: typeof keys[index + 1] === "string" ? keys[index + 1] : null,
       hunters,
       arena: arenaPick(hunters),
+      ...monsterView((monsters[s.id] = monsterStep(oldMonsters[s.id], agentsOf(ps).map((p) => ({
+        state: huntState(p.status), done: p.status === "done" || p.report === "done",
+      })), now)), now),
     };
   });
 
-  return { areas, state: { ...state, classes } };
+  return { areas, state: { ...state, classes, monsters } };
 }
