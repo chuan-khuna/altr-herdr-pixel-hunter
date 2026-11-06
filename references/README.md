@@ -33,3 +33,5 @@ Candidates:
 - https://toffeecraft.itch.io/cat-retro
 - https://toffeecraft.itch.io/cat-pack
 - https://toffeecraft.itch.io/cat-room
+- https://cupnooble.itch.io/sprout-lands-ui-pack
+- https://shubibubi.itch.io/cozy-people
