@@ -35,3 +35,4 @@ Candidates:
 - https://toffeecraft.itch.io/cat-room
 - https://cupnooble.itch.io/sprout-lands-ui-pack
 - https://shubibubi.itch.io/cozy-people
+- https://rafaelmatos.itch.io/epic-rpg-world-pack-free-demo-ancient-ruins-asset-tileset
