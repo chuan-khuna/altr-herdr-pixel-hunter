@@ -7,7 +7,7 @@
    (art/tiles/), then desaturated and darkened toward the canvas color so the sprites
    stand out. Written to art/arena/<map>.png.
 2. Nearest-neighbour 4x copies of everything drawn larger than 1:1 (arenas, Hunter
-   and Monster sprite strips, Monster facesets), in art/x4/ at the same relative
+   and Monster sprite strips, Monster facesets, Pet sprite sheets), in art/x4/ at the same relative
    paths. GPUI scales images with a smooth filter, so a 16 px sprite drawn at 32 px
    blurs; a 4x copy drawn at 2x is an exact 2:1 downscale on a 1x screen and 1:1 on a
    2x screen, so every art pixel stays a crisp square.
@@ -160,10 +160,17 @@ def x4(img):
 # Sprite strips and faces drawn above 1:1, copied from the pack's files under art/.
 SCALED = [f"chars/{c}/{f}.png" for c in ("Knight", "SorcererBlack", "Hunter", "NinjaMasked", "Monk", "Samurai")
           for f in ("Idle", "Attack", "Item", "Jump")]
-SCALED += [f"boss/{b}/{f}" for b, idle in (("GiantRacoon", "Idle.png"), ("DemonCyclop", "Idle.png"),
-                                           ("GiantSpirit", "Idle.png"), ("TenguBlue", "Idle.png"),
-                                           ("GiantRedSamurai", "Idle.png"), ("GiantFrog", "Idle40x40.png"))
-           for f in (idle, "Faceset.png")]
+# Monsters: Idle strip, Hit strip (Racoon has no Hit, so its Attack plays instead), face.
+SCALED += [f"boss/{b}/{f}" for b, idle, hit in (("GiantRacoon", "Idle.png", "Attack.png"),
+                                                ("DemonCyclop", "Idle.png", "Hit.png"),
+                                                ("GiantSpirit", "Idle.png", "Hit.png"),
+                                                ("TenguBlue", "Idle.png", "Hit.png"),
+                                                ("GiantRedSamurai", "Idle.png", "Hit.png"),
+                                                ("GiantFrog", "Idle40x40.png", "Hit.png"))
+           for f in (idle, hit, "Faceset.png")]
+# Pets: each small animal's two-frame sprite sheet (the arena draws it at 2x).
+SCALED += [f"animals/{a}/SpriteSheet.png" for a in ("Cat", "Dog", "Dog2", "Cub", "Frog", "Racoon",
+                                                     "Monkey", "Chicken", "Pig", "Fish")]
 
 
 def main():

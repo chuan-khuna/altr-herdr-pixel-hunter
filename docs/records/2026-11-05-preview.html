@@ -6,27 +6,10 @@
 <title>pixel-hunter preview</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Handjet:wght@400;600&family=Jersey+10&family=Micro+5&family=Pixelify+Sans:wght@400;600&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=Tiny5&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/pixel-hunter.css">
 <style>
-  :root {
-    --canvas:   #101a24;
-    --chrome:   #15222e;
-    --surface:  #192a38;
-    --selected: #1c2f40;
-    --border:   #2e475b;
-    --dim:      #7e9e99;
-    --text:     #c5ccb8;
-    --accent:   #95c5ac;
-    --hunting:  #7ca1c0;
-    --help:     #f3a787;
-    --cleared:  #6eaa78;
-    --hp:       #c38890;
-
-    --ui-font: "Pixelify Sans";
-    --ui-size: 15px;
-    --mono: ui-monospace, "SF Mono", Menlo, monospace;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; }
+  /* tokens, reset and scrollbars: ../styles/pixel-hunter.css */
+  :root { --ui-size: 15px; }
   body { background: #0b131b; color: var(--text); font: 15px/1.5 "Pixelify Sans", system-ui, sans-serif; padding: 28px 16px 64px; }
   main { max-width: 1280px; margin: 0 auto; }
   .logo { font-family: "Press Start 2P", monospace; letter-spacing: 0; }
@@ -74,24 +57,23 @@
   .areas { overflow: auto; flex: 1; }
   .area { border-bottom: 2px solid var(--border); padding: 8px 10px 10px; }
   .area.current { background: var(--selected); }
-  .arow { display: flex; align-items: center; gap: 8px; }
-  .arow .chev { color: var(--dim); width: 10px; }
-  .arow .mface { width: 20px; height: 20px; flex-shrink: 0; background-size: 38px 38px; background-position: -9px -6px; border: 2px solid var(--border); }
-  .arow .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .arow .map { color: var(--dim); flex-shrink: 0; }
-  .arow .sp { flex: 1; }
+  .arow { display: grid; grid-template-columns: 10px 76px minmax(0, 1fr); gap: 0 8px; align-items: center; }
+  .arow .chev { color: var(--dim); width: 10px; grid-row: span 3; }
+  .arow .mface { width: 76px; height: 76px; grid-row: span 3; background-size: 76px 76px; border: 2px solid var(--border); }
+  .arow .l1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .arow .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
   .arow .dot { width: 8px; height: 8px; flex-shrink: 0; }
-  .arow .hpm { width: 36px; flex-shrink: 0; }
   .arow .key { color: var(--dim); font-size: .85em; flex-shrink: 0; }
-  .apath { color: var(--dim); font-size: .87em; margin: 1px 0 4px 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .apath b { color: var(--text); font-weight: 400; }
-  .mem { margin: 5px 0 0 16px; padding: 4px 6px; display: grid; grid-template-columns: 38px 1fr; gap: 0 8px; border: 2px solid transparent; cursor: pointer; }
+  .arow .apath, .arow .abr { color: var(--dim); font-size: .87em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .arow .abr { color: var(--text); }
+  .mem { margin: 5px 0 0 16px; padding: 4px 6px; display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 0 8px; border: 2px solid transparent; cursor: pointer; }
   .mem.help { border-color: var(--help); background: #f3a78712; }
   .mem .face { width: 38px; height: 38px; grid-row: span 2; background-size: 38px 38px; border: 2px solid var(--border); }
   .mem .l1 { display: flex; gap: 8px; align-items: baseline; }
   .mem .cls { font-weight: 600; }
   .st { font-weight: 600; font-size: .87em; letter-spacing: .04em; text-transform: uppercase; }
-  .mem .l2 { display: flex; gap: 6px; align-items: center; color: var(--dim); font-size: .9em; white-space: nowrap; }
+  .mem .l2 { display: flex; gap: 6px; align-items: center; color: var(--dim); font-size: .9em; white-space: nowrap; min-width: 0; }
+  .mem .l2 .rk { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .grade { font-weight: 600; font-size: .82em; line-height: 1; color: var(--canvas); background: var(--accent); padding: 2px 4px; }
   .grade.unk { background: var(--dim); }
   .sta { width: 46px; margin-left: auto; flex-shrink: 0; }
@@ -118,6 +100,7 @@
   .term .box { border: 1px solid var(--help); padding: 6px 8px; margin-top: 8px; display: block; }
 
   /* ---------- galleries ---------- */
+  #monsters { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
   .g { padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .g .stage { width: 100%; height: 110px; display: grid; place-items: center; background: var(--canvas); border: 2px solid var(--border); position: relative; }
@@ -168,6 +151,7 @@
 
   <h2>Herdr window</h2>
   <p class="sub">320 px sidebar. Area <b>shop-api</b> is open with four Hunters in its Party. Click a Hunter card to see how focus moves.</p>
+  <p class="sub">Revised later on 2026-11-05: Area rows have three lines (space name, path, branch) beside a 76 px Monster face. The map name and HP bar appear only in the arena, so the row no longer repeats them.</p>
   <div class="winwrap"><div class="win ui" id="win"></div></div>
 
   <h2>Hunters (Class)</h2>
@@ -176,7 +160,12 @@
 
   <h2>Monsters</h2>
   <p class="sub">Bosses are 40 to 68 px with real multi-frame Idle and Hit animations. Hit plays while the Party is Hunting.</p>
+  <p class="sub">Revised later on 2026-11-05: this gallery now shows all 12 bosses in the pack, including the six the app doesn't use yet, so one can be picked from the list. The Red Warlord was drawn wrong: its frames are 96×48 (swords out to the sides), not 48×48 squares, so each frame showed half the samurai. The 96×48 frames fix it.</p>
   <div class="grid ui" id="monsters"></div>
+
+  <h2>Small monsters</h2>
+  <p class="sub">Added later on 2026-11-05: all 58 small monsters in the pack. Each is a 16×16 sprite (the same size as a Hunter) shown at 3×, walking down. These have no Idle or Hit strips, only a 4-frame walk per direction.</p>
+  <div class="grid ui" id="smalls"></div>
 
   <h2>Areas</h2>
   <p class="sub">Each arena is 160×96 art px built from the pack's tiles and shown at 2×. Following Valve's "quiet world" rule, every arena is desaturated and sunk toward the canvas color so the sprites stand out.</p>
@@ -204,15 +193,31 @@ const HUNTERS = [
   { cls: 'Monk',    ch: 'Monk',          rank: ['C','Haiku 5.5'],  sta: 90 },
   { cls: 'Samurai', ch: 'Samurai',       rank: ['S','Fable 5.1'],  sta: 15 },
 ];
-// frame sizes read from the PNGs
-const MONSTERS = {
-  forest:   { id: 'GiantRacoon',     name: 'Giant Racoon',  idle: ['Idle.png', 60, 6],       hit: ['Attack.png', 60, 4] },
-  desert:   { id: 'DemonCyclop',     name: 'Demon Cyclops', idle: ['Idle.png', 50, 5],       hit: ['Hit.png', 50, 3] },
-  dungeon:  { id: 'GiantSpirit',     name: 'Giant Spirit',  idle: ['Idle.png', 50, 5],       hit: ['Hit.png', 50, 3] },
-  field:    { id: 'TenguBlue',       name: 'Blue Tengu',    idle: ['Idle.png', 68, 6],       hit: ['Hit.png', 68, 8] },
-  ruins:    { id: 'GiantRedSamurai', name: 'Red Warlord',   idle: ['Idle.png', 48, 12],      hit: ['Hit.png', 48, 8] },
-  lakeside: { id: 'GiantFrog',       name: 'Giant Frog',    idle: ['Idle40x40.png', 40, 5],  hit: ['Hit.png', 40, 3] },
+// Every boss in the pack. Strips are [file, frame width, frames, frame height (default = width)],
+// read from the PNGs. The two samurai have 96x48 frames (swords out to the sides), not 48x48 squares.
+const BOSSES = {
+  GiantRacoon:      { name: 'Giant Racoon',        idle: ['Idle.png', 60, 6],      hit: ['Attack.png', 60, 4] },
+  GiantRacoonGold:  { name: 'Gold Racoon',         idle: ['Idle.png', 60, 6],      hit: ['Attack.png', 60, 4] },
+  DemonCyclop:      { name: 'Demon Cyclops',       idle: ['Idle.png', 50, 5],      hit: ['Hit.png', 50, 3] },
+  DemonCyclop2:     { name: 'Demon Cyclops (alt)', idle: ['Idle.png', 50, 5],      hit: ['Hit.png', 50, 3] },
+  GiantSpirit:      { name: 'Giant Spirit',        idle: ['Idle.png', 50, 5],      hit: ['Hit.png', 50, 3] },
+  GiantFlam:        { name: 'Giant Flame',         idle: ['Idle.png', 50, 5],      hit: ['Hit.png', 50, 3] },
+  TenguBlue:        { name: 'Blue Tengu',          idle: ['Idle.png', 68, 6],      hit: ['Hit.png', 68, 8] },
+  TenguRed:         { name: 'Red Tengu',           idle: ['Idle.png', 82, 6],      hit: ['Hit.png', 82, 8] },
+  GiantRedSamurai:  { name: 'Red Warlord',         idle: ['Idle.png', 96, 6, 48],  hit: ['Hit.png', 96, 4, 48] },
+  GiantBlueSamurai: { name: 'Blue Warlord',        idle: ['Idle.png', 96, 6, 48],  hit: ['Hit.png', 96, 4, 48] },
+  GiantFrog:        { name: 'Giant Frog',          idle: ['Idle40x40.png', 40, 5], hit: ['Hit.png', 40, 3] },
+  GiantFrog2:       { name: 'Giant Frog (alt)',    idle: ['Idle.png', 40, 5],      hit: ['Hit.png', 40, 3] },
 };
+const MAP_BOSS = { forest: 'GiantRacoon', desert: 'DemonCyclop', dungeon: 'GiantSpirit', field: 'TenguBlue', ruins: 'GiantRedSamurai', lakeside: 'GiantFrog' };
+const MONSTERS = Object.fromEntries(Object.entries(MAP_BOSS).map(([map, id]) => [map, { id, ...BOSSES[id] }]));
+// The pack's small monsters: a 64x64 sheet, columns = direction (down, up, left, right), rows = 4 walk frames.
+const SMALL = ['Axolot','AxolotBlue','Bamboo','BambooYellow','Beast','Beast2','Butterfly','ButterflyBlue','Cyclope','Cyclope2',
+  'Dragon','DragonYellow','Eye','Eye2','Fish','FishRed','Flam','Flam2','GoldRacoon','HeartGreen','HeartRed','KappaGreen','KappaRed',
+  'LanternGreen','LanternRed','Larva','Larva2','Lizard','Lizard2','Mole','Mole2','Mollusc','Mollusc2','Mouse','MouseBlack',
+  'Mushroom','Mushroom2','Octopus','Octopus2','Owl','Owl2','Racoon','Reptile','Reptile2','Skull','SkullBlue',
+  'Slime','Slime2','Slime3','Slime4','Snake','Snake2','Snake3','Snake4','SpiderRed','SpiderYellow','Spirit','Spirit2'];
+const words = id => id.replace(/([a-z])([A-Z0-9])/g, '$1 $2');
 const MAPS = ['forest','desert','dungeon','field','ruins','lakeside'];
 const cap = s => s[0].toUpperCase() + s.slice(1);
 
@@ -265,24 +270,35 @@ function setHunter(el, state) {
     el.insertAdjacentHTML('beforeend', '<span class="zz">z</span>');
   }
 }
-function monsterEl(map, s = 2) {
-  const m = MONSTERS[map], fw = m.idle[1];
+// A boss sprite; `id` is a BOSSES key. Sized by its Idle frame.
+function monsterEl(id, s = 2) {
+  const [, fw, , fh = fw] = BOSSES[id].idle;
   const el = document.createElement('div');
-  el.className = 'spr'; el.style.width = el.style.height = fw*s + 'px';
-  el.dataset.map = map; el.dataset.s = s;
+  el.className = 'spr'; el.style.width = fw*s + 'px'; el.style.height = fh*s + 'px';
+  el.dataset.id = id; el.dataset.s = s;
   return el;
 }
 function setMonster(el, mode) {
-  const m = MONSTERS[el.dataset.map], s = +el.dataset.s;
+  const id = el.dataset.id, m = BOSSES[id], s = +el.dataset.s;
   el.getAnimations().forEach(a => a.cancel());
   el.classList.toggle('slain', mode === 'slain');
-  const [file, fw, n] = mode === 'hit' ? m.hit : m.idle;
-  el.style.backgroundImage = `url(${NA}/boss/${m.id}/${file})`;
-  el.style.backgroundSize = `${fw*n*s}px ${fw*s}px`;
+  const [file, fw, n, fh = fw] = mode === 'hit' ? m.hit : m.idle;
+  el.style.backgroundImage = `url(${NA}/boss/${id}/${file})`;
+  el.style.backgroundSize = `${fw*n*s}px ${fh*s}px`;
   el.animate([{ backgroundPosition: '0 0' }, { backgroundPosition: `${-fw*n*s}px 0` }],
     { duration: (mode === 'hit' ? 90 : 160) * n, iterations: mode === 'slain' ? 1 : Infinity, easing: `steps(${n})`, fill: 'forwards' });
   if (mode === 'hit') el.animate([{transform:'translateX(0)'},{transform:'translateX(-2px)'},{transform:'translateX(2px)'},{transform:'translateX(0)'}],
     { duration: 300, iterations: Infinity, easing: 'steps(4)', composite: 'add' });
+}
+// A small monster walking down: column 0 of its sheet, rows 0..3.
+function smallEl(id, s = 3) {
+  const el = document.createElement('div');
+  el.className = 'spr'; el.style.width = el.style.height = 16*s + 'px';
+  el.style.backgroundImage = `url(${NA}/monsters/${id}/sheet.png)`;
+  el.style.backgroundSize = `${64*s}px ${64*s}px`;
+  el.animate([{ backgroundPosition: '0 0' }, { backgroundPosition: `0 ${-64*s}px` }],
+    { duration: 4 * 160, iterations: Infinity, easing: 'steps(4)' });
+  return el;
 }
 const face = c => `background-image:url(${ch(c,'Faceset.png')})`;
 const mface = map => `background-image:url(${NA}/boss/${MONSTERS[map].id}/Faceset.png)`;
@@ -325,9 +341,9 @@ function buildArena(map, members, sts, mode) {
     setHunter(e, sts[i]);
   });
   const mw = document.createElement('div'); mw.className = 'who';
-  const fw = MONSTERS[map].idle[1]*2;
-  mw.style.left = (236 - fw/2) + 'px'; mw.style.top = (128 - fw) + 'px';
-  const me = monsterEl(map, 2); mw.appendChild(me); a.appendChild(mw);
+  const [, iw, , ih = iw] = MONSTERS[map].idle;
+  mw.style.left = (236 - iw) + 'px'; mw.style.top = (128 - ih*2) + 'px';
+  const me = monsterEl(MONSTERS[map].id, 2); mw.appendChild(me); a.appendChild(mw);
   setMonster(me, mode);
   const hp = mode === 'slain' ? 0 : mode === 'hit' ? 58 : 100;
   a.insertAdjacentHTML('beforeend', `<div class="mapname">${cap(map)} · ${MONSTERS[map].name}</div>
@@ -343,8 +359,16 @@ function memberRow(h, st, i, extra = '') {
   return `<div class="mem ${st==='help'?'help':''}" data-i="${i}">
     <div class="face px" style="${face(h.ch)}"></div>
     <div class="l1"><span class="cls">${h.cls}</span><span class="st" style="color:${s.color}">${s.label}</span></div>
-    <div class="l2"><span class="grade ${h.rank[0]==='?'?'unk':''}">${h.rank[0]}</span>${h.rank[1]}${extra}${sta}</div>
+    <div class="l2"><span class="grade ${h.rank[0]==='?'?'unk':''}">${h.rank[0]}</span><span class="rk">${h.rank[1]}${extra}</span>${sta}</div>
   </div>`;
+}
+// Area row: the Monster's face spans three lines (space name, path, branch).
+// The map name and HP are shown only in the arena, so the row doesn't repeat them.
+function areaRow(open, map, name, dot, key, path, branch) {
+  return `<div class="arow"><span class="chev">${open?'▾':'▸'}</span><span class="mface px" style="${mface(map)}"></span>
+    <div class="l1"><span class="name">${name}</span><span class="dot" style="background:${dot}"></span><span class="key">${key}</span></div>
+    <div class="apath">${path}</div>
+    <div class="abr">${branch ? '⎇ ' + branch : ''}</div></div>`;
 }
 function worst(sts) { return ['help','hunting','cleared','resting'].find(x => sts.includes(x)); }
 
@@ -357,22 +381,18 @@ function renderWindow() {
     <div id="arenaSlot"></div>
     <div class="areas">
       <div class="area current">
-        <div class="arow"><span class="chev">▾</span><span class="mface px" style="${mface('forest')}"></span><span class="name">shop-api</span><span class="map">· Forest</span><span class="sp"></span><span class="dot" style="background:${ST[worst(sts)].color}"></span><span class="bar hpm"><i style="width:${mode==='slain'?0:mode==='hit'?58:100}%;background:var(--hp)"></i></span><span class="key">⌃1</span></div>
-        <div class="apath">~/code/shop-api · <b>feat/login</b></div>
+        ${areaRow(true, 'forest', 'shop-api', ST[worst(sts)].color, '⌃1', '~/code/shop-api', 'feat/login')}
         ${party.map((h,i) => memberRow(h, sts[i], i, i===1 ? ' · ⎇ fix/cart' : '')).join('')}
       </div>
       <div class="area">
-        <div class="arow"><span class="chev">▸</span><span class="mface px" style="${mface('desert')}"></span><span class="name">herdr-monster-hunter</span><span class="map">· Desert</span><span class="sp"></span><span class="dot" style="background:var(--cleared)"></span><span class="bar hpm"><i style="width:0%"></i></span><span class="key">⌃2</span></div>
-        <div class="apath">~/Documents/code/personal/herdr-monster-hunter · <b>main</b></div>
+        ${areaRow(false, 'desert', 'herdr-monster-hunter', 'var(--cleared)', '⌃2', '~/Documents/code/personal/herdr-monster-hunter', 'main')}
       </div>
       <div class="area">
-        <div class="arow"><span class="chev">▾</span><span class="mface px" style="${mface('dungeon')}"></span><span class="name">Login fix</span><span class="map">· Dungeon</span><span class="sp"></span><span class="dot" style="background:var(--hunting)"></span><span class="bar hpm"><i style="width:80%;background:var(--hp)"></i></span><span class="key">⌃3</span></div>
-        <div class="apath">~/code/auth-service · <b>fix/session</b></div>
+        ${areaRow(true, 'dungeon', 'Login fix', 'var(--hunting)', '⌃3', '~/code/auth-service', 'fix/session')}
         ${memberRow(HUNTERS[5], 'hunting', 9)}
       </div>
       <div class="area">
-        <div class="arow"><span class="chev">▸</span><span class="mface px" style="${mface('field')}"></span><span class="name">dotfiles</span><span class="map">· Field</span><span class="sp"></span><span class="dot" style="background:var(--dim)"></span><span class="bar hpm"><i style="width:100%;background:var(--hp)"></i></span><span class="key">⌃4</span></div>
-        <div class="apath">~/dotfiles · <b>main</b></div>
+        ${areaRow(false, 'field', 'dotfiles', 'var(--dim)', '⌃4', '~/dotfiles', null)}
       </div>
     </div>
   </aside>
@@ -437,13 +457,22 @@ function renderGalleries() {
   });
   const mode = monsterMode(sts);
   const ms = document.getElementById('monsters'); ms.innerHTML = '';
-  MAPS.forEach(map => {
-    const m = MONSTERS[map];
+  Object.entries(BOSSES).forEach(([id, m]) => {
+    const map = MAPS.find(k => MAP_BOSS[k] === id);
+    const [, fw, , fh = fw] = m.idle;
     const g = document.createElement('div'); g.className = 'g card';
-    g.innerHTML = `<div class="stage" style="height:160px"></div><div class="faces"><span class="px" style="${mface(map)}"></span><span class="nm">${m.name}</span></div>
-      <div class="meta">${m.id} · ${m.idle[1]}px · lives in ${cap(map)}</div>`;
-    const e = monsterEl(map, 2); g.querySelector('.stage').appendChild(e); setMonster(e, mode);
+    g.innerHTML = `<div class="stage" style="height:200px"></div><div class="faces"><span class="px" style="background-image:url(${NA}/boss/${id}/Faceset.png)"></span><span class="nm">${m.name}</span></div>
+      <div class="meta">${id} · ${fw}×${fh}px · ${map ? 'lives in ' + cap(map) : '<span style="color:var(--accent)">not in the app yet</span>'}</div>`;
+    const e = monsterEl(id, 2); g.querySelector('.stage').appendChild(e); setMonster(e, mode);
     ms.appendChild(g);
+  });
+  const ss = document.getElementById('smalls');
+  if (!ss.childElementCount) SMALL.forEach(id => {
+    const g = document.createElement('div'); g.className = 'g card';
+    g.innerHTML = `<div class="stage" style="height:80px"></div><div class="faces"><span class="px" style="background-image:url(${NA}/monsters/${id}/Faceset.png)"></span><span class="nm">${words(id)}</span></div>
+      <div class="meta">${id} · 16×16px</div>`;
+    g.querySelector('.stage').appendChild(smallEl(id, 3));
+    ss.appendChild(g);
   });
   const as = document.getElementById('areas'); as.innerHTML = '';
   MAPS.forEach((map, k) => {

@@ -2,6 +2,8 @@
 
 **Status:** ready-for-agent
 
+**Amended by:** `.scratch/pixel-hunter-pets/spec.md` (Pets, Hunter row layout F, three-line Area rows, random Respawn). Stories 3, 6, 8, 15, 22, 28, 29 and 39 below are superseded where they disagree.
+
 Vocabulary follows `GLOSSARY.md` (Area, Monster, HP, Respawn, Hunter, Class, Party, Stamina, Rank, Hunting, Needs help, Cleared, Slain, Resting). Visual references: `docs/records/2026-11-05-color-theme.html` (palette and color principles) and `docs/records/2026-11-05-preview.html` (full window mock with real sprites).
 
 ## Problem Statement

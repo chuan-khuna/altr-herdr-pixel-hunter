@@ -77,7 +77,10 @@
           "window_drag": true,
           "background": "chrome",
           "content": {
-            "mod": "tabs"
+            "mod": "pixel-hunter",
+            "props": {
+              "role": "tabs"
+            }
           }
         },
         {
@@ -103,6 +106,17 @@
                   "focus": {
                     "width": 2,
                     "color": "accent"
+                  },
+                  "header": {
+                    "content": {
+                      "mod": "pixel-hunter",
+                      "props": {
+                        "role": "pane"
+                      }
+                    },
+                    "height": 30,
+                    "position": "top",
+                    "reveal": "always"
                   }
                 }
               }

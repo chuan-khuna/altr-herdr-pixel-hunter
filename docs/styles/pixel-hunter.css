@@ -1,0 +1,109 @@
+/*
+ * pixel-hunter docs theme: shared by docs/records/*.html and docs/documents/*.html.
+ * Colours come from the pixel-hunter-night theme (docs/records/2026-11-05-color-theme.html).
+ * Pages link it first and may override anything in their own <style>.
+ *
+ *   <link rel="stylesheet" href="../styles/pixel-hunter.css">
+ */
+@import url("https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Press+Start+2P&family=Noto+Sans+Thai+Looped:wght@400;600&display=swap");
+
+/* ---------- tokens: pixel-hunter-night ---------- */
+:root {
+  /* environment ramp: cool, desaturated blue-cyan, no neutral gray */
+  --canvas:   #101a24;
+  --chrome:   #15222e;
+  --surface:  #192a38;
+  --selected: #1c2f40;
+  --border:   #2e475b;
+  --dim:      #7e9e99;   /* grey teal */
+  --text:     #c5ccb8;   /* sage cream, not white */
+  --page:     #0b131b;   /* behind cards and mock windows */
+  --shadow:   #0a1219;
+
+  /* signal colours: the saturation budget */
+  --accent:   #95c5ac;   /* focus frame, rank grade, headings */
+  --hunting:  #7ca1c0;   /* busy, nothing to do; links */
+  --help:     #f3a787;   /* warmest + brightest: needs you */
+  --cleared:  #6eaa78;   /* done */
+  --hp:       #c38890;   /* monster only */
+  --resting:  var(--dim);
+
+  --px: 2px;             /* one art pixel at 2x: frame width */
+  --radius: 0;           /* pixel frames are square */
+
+  --ui-font: "Pixelify Sans";
+  --body-font: "Pixelify Sans", "Noto Sans Thai Looped", system-ui, sans-serif;
+  --thai-font: "Noto Sans Thai Looped", "Pixelify Sans", system-ui, sans-serif;
+  --logo-font: "Press Start 2P", monospace;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page);
+  color: var(--text);
+  font: 15px/1.5 var(--body-font);
+  padding: 28px 16px 64px;
+}
+main { max-width: 1040px; margin: 0 auto; }
+:lang(th), .th { font-family: var(--thai-font); }
+
+h1 { font-size: 18px; line-height: 1.6; margin: 0 0 10px; }
+h2 { font-size: 18px; font-weight: 600; color: var(--accent); margin: 44px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+h3 { font-size: 16px; font-weight: 600; margin: 28px 0 6px; }
+p, li { max-width: 80ch; }
+.sub, .lede { color: var(--dim); margin: 0 0 14px; max-width: 80ch; }
+a { color: var(--hunting); }
+.logo { font-family: var(--logo-font); letter-spacing: 0; }
+.px { image-rendering: pixelated; }
+
+code { font-family: var(--mono); font-size: .85em; color: var(--text); background: var(--surface); padding: 1px 5px; }
+pre { font-family: var(--mono); font-size: 13px; line-height: 1.5; background: var(--canvas); border: var(--px) solid var(--border); padding: 12px 14px; overflow: auto; }
+pre code { background: none; padding: 0; font-size: inherit; }
+/* Shiki output: keep its token colours, use the theme's block background */
+pre.shiki { background: var(--canvas) !important; }
+
+table { border-collapse: collapse; margin: 12px 0; }
+th, td { border: var(--px) solid var(--border); padding: 4px 10px; text-align: left; vertical-align: top; }
+th { background: var(--chrome); font-weight: 600; color: var(--accent); }
+
+/* ---------- frames ---------- */
+.card, .frame {
+  background: var(--chrome);
+  border: var(--px) solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+
+button, .chip {
+  font: 600 13px var(--body-font); color: var(--text);
+  background: var(--surface); border: var(--px) solid var(--border);
+  padding: 4px 10px; cursor: pointer;
+}
+button[aria-pressed="true"], .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- table of contents ---------- */
+nav.toc { padding: 10px 14px; margin: 16px 0 24px; }
+nav.toc ol { margin: 4px 0 0; padding-left: 20px; }
+nav.toc a { color: var(--text); text-decoration: none; }
+nav.toc a:hover { color: var(--accent); }
+
+/* ---------- diagrams (Mermaid rendered with Pele) ---------- */
+figure.diagram { margin: 16px 0; padding: 0; position: relative; }
+figure.diagram .stage { overflow: hidden; background: var(--canvas); padding: 12px; }
+figure.diagram img, figure.diagram svg { display: block; max-width: 100%; height: auto; transform-origin: 0 0; }
+figure.diagram .controls { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; }
+figure.diagram .controls button { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; }
+figure.diagram.open { position: fixed; inset: 16px; z-index: 50; margin: 0; background: var(--chrome); }
+figure.diagram.open .stage { height: 100%; overflow: auto; }
+figure.diagram figcaption { color: var(--dim); font-size: 13px; padding: 6px 12px; }
+
+/* ---------- thin scrollbars ---------- */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+::-webkit-scrollbar-button { display: none; }

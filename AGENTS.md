@@ -23,6 +23,7 @@ Read its **Layouts**, **Mods** and **Share** sections before touching anything.
     mods/<each mod the layout uses that isn't shipped by Herdr>/
     RECIPE.md                     brief another agent builds it from, empty folder
     preview.png                   screenshot of the layout running
+    LICENSE                       MIT for the code (art is CC0, fonts OFL; not synced)
   ```
 
 - `scripts/sync.sh` copies the live layout, its `pixel-hunter*` themes and mods into
@@ -48,6 +49,49 @@ Read its **Layouts**, **Mods** and **Share** sections before touching anything.
 
 Never list a shipped Herdr mod (e.g. `files`, `changes`) as part of this
 layout's folder; reference it by name in RECIPE.md's **Built from** instead.
+
+## Project docs
+
+### Documents
+
+Documents about this project, including how it is implemented, live in
+`docs/documents/<topic>.md` (or `.html`). `docs/documents/INDEX.md` is the
+entry point: it lists every document as one bullet,
+`- [Title](file) — one-line summary`.
+
+- Read the index before working on an area, and open the documents relevant to it.
+- When you add, rename or remove a document, update `INDEX.md` in the same change.
+- Keep documents in step with the code they describe: if a change makes a
+  document wrong, fix the document in the same change.
+
+### Records
+
+Discussion records live at `docs/records/yyyy-mm-dd-<topic>.md` (or `.html`
+for visual records such as mocks and palettes), dated the day the discussion
+took place. Each record captures one discussion: what was discussed, what was
+decided, and any open questions. Records are history: don't rewrite a past
+decision in one. Record a new discussion instead. You may still fix a mock so
+it shows the current design, as long as the record says so.
+
+### HTML documents and records
+
+- **Theme:** link the shared stylesheet `docs/styles/pixel-hunter.css`
+  (`<link rel="stylesheet" href="../styles/pixel-hunter.css">`). It holds the
+  pixel-hunter-night tokens (`--canvas`, `--accent`, `--help`, …), the base
+  type, square 2 px pixel frames (`.card`), tables, the TOC, diagram frames and
+  thin themed scrollbars. Put page-only rules in the page's own `<style>`
+  after the link. Add a rule to the shared file only when two pages need it.
+  The theme is dark only, so there is no theme switcher.
+- **Code blocks:** highlight with Shiki on a dark theme (Catppuccin Mocha or
+  Rosé Pine Moon). The stylesheet puts the block on `--canvas`.
+- **Diagrams:** write them in Mermaid and render with Pele (pele.run/api),
+  inside `<figure class="diagram">`. Make them expandable and zoomable, with
+  expand, close and zoom icon buttons in `.controls`.
+- **Shape:** square corners and 2 px frames, as the layout does (spec: no
+  rounded corners). Do not use the usual 3–6 px radius.
+- Include a table of contents (`<nav class="toc card">`).
+- **Thai body text:** use the looped Thai font Noto Sans Thai Looped. It is in
+  the stylesheet's font stack and applies to `:lang(th)` or `.th`.
 
 ## Agent skills
 
